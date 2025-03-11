@@ -34,7 +34,8 @@ class TorchTabularTextDataset(TorchDataset):
     def __init__(
         self,
         encodings: transformers.BatchEncoding,
-        categorical_feats: Optional[pd.DataFrame],
+        # categorical_feats: Optional[pd.DataFrame],
+        categorical_feats: Optional[np.ndarray],
         numerical_feats: Optional[np.ndarray],
         labels: Optional[Union[List, np.ndarray]] = None,
         df: Optional[pd.DataFrame] = None,
@@ -43,6 +44,7 @@ class TorchTabularTextDataset(TorchDataset):
         self.df = df
         self.encodings = encodings
         self.cat_feats = categorical_feats.values if categorical_feats is not None else None
+        # self.cat_feats = categorical_feats if categorical_feats is not None else None
         self.numerical_feats = numerical_feats
         self.labels = labels
         self.label_list = (
@@ -52,12 +54,12 @@ class TorchTabularTextDataset(TorchDataset):
         )
 
     def __getitem__(self, idx: int):
-        item = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+        item = {}
         item["labels"] = (
             torch.tensor(self.labels[idx]) if self.labels is not None else None
         )
         item["cat_feats"] = (
-            torch.tensor(self.cat_feats[idx]).float()
+            torch.tensor(self.cat_feats[idx])
             if self.cat_feats is not None
             else torch.zeros(0)
         )
@@ -69,7 +71,7 @@ class TorchTabularTextDataset(TorchDataset):
         return item
 
     def __len__(self) -> int:
-        return len(self.encodings["input_ids"])
+        return len(self.numerical_feats)
 
     def get_labels(self) -> Optional[List[Union[str]]]:
         """Returns the label names for classification."""

@@ -31,6 +31,8 @@ class TabularConfig:
         numerical_feat_dim=0,
         cat_feat_dim=0,
         class_weights=None,
+        cat_offsets=None,
+        num_feats=0,
         **kwargs
     ):
         self.mlp_division = mlp_division
@@ -45,3 +47,5 @@ class TabularConfig:
         self.cat_feat_dim = cat_feat_dim
         self.num_labels = num_labels
         self.class_weights = class_weights
+        self.cat_offsets = cat_offsets
+        self.num_feats = num_feats

@@ -129,6 +129,7 @@ def hf_loss_func(inputs, classifier, labels, num_labels, class_weights):
     if type(logits) is tuple:
         logits, layer_outputs = logits[0], logits[1]
     else:  # simple classifier
+        # print("simple classifier", inputs, logits)
         layer_outputs = [inputs, logits]
     if labels is not None:
         if num_labels == 1:
@@ -137,9 +138,10 @@ def hf_loss_func(inputs, classifier, labels, num_labels, class_weights):
             labels = labels.float()
             loss = loss_fct(logits.view(-1), labels.view(-1))
         else:
-            loss_fct = CrossEntropyLoss(weight=class_weights)
+            loss_fct = CrossEntropyLoss()
             labels = labels.long()
             loss = loss_fct(logits.view(-1, num_labels), labels.view(-1))
+            # print("loss", loss)
     else:
         return None, logits, layer_outputs
 

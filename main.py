@@ -18,7 +18,7 @@ from transformers import (
 )
 
 from evaluation import calc_classification_metrics, calc_regression_metrics
-from multimodal_transformers.data import load_data_from_folder, load_data_into_folds
+from multimodal_transformers.data import load_data_from_folder, load_data_into_folds, TorchTabularTextDataset
 from multimodal_transformers.model import AutoModelWithTabular, TabularConfig
 from multimodal_transformers.multimodal_arguments import (
     ModelArguments,
@@ -26,6 +26,7 @@ from multimodal_transformers.multimodal_arguments import (
     OurTrainingArguments,
 )
 from util import create_dir_if_not_exists, get_args_info_as_str
+from sklearn.preprocessing import StandardScaler
 
 os.environ["COMET_MODE"] = "DISABLED"
 logger = logging.getLogger(__name__)
@@ -73,14 +74,7 @@ def main():
         f"======== Training Args ========\n{get_args_info_as_str(training_args)}\n"
     )
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        (
-            model_args.tokenizer_name
-            if model_args.tokenizer_name
-            else model_args.model_name_or_path
-        ),
-        cache_dir=model_args.cache_dir,
-    )
+    tokenizer = None
 
     if not data_args.create_folds:
         train_dataset, val_dataset, test_dataset = load_data_from_folder(
@@ -112,7 +106,8 @@ def main():
         val_datasets = [val_dataset]
         test_datasets = [test_dataset]
     else:
-        train_datasets, val_datasets, test_datasets = load_data_into_folds(
+        print("hello")
+        train_datasets, val_datasets, test_datasets, cat_offsets = load_data_into_folds(
             data_args.data_path,
             data_args.num_folds,
             data_args.validation_ratio,
@@ -129,16 +124,60 @@ def main():
             numerical_handle_na=data_args.numerical_handle_na,
             numerical_how_handle_na=data_args.numerical_how_handle_na,
             numerical_na_value=data_args.numerical_na_value,
-            sep_text_token_str=(
-                tokenizer.sep_token
-                if not data_args.column_info["text_col_sep_token"]
-                else data_args.column_info["text_col_sep_token"]
-            ),
+            sep_text_token_str=None,
             max_token_length=training_args.max_token_length,
-            debug=training_args.debug_dataset,
+            debug=False,
             debug_dataset_size=training_args.debug_dataset_size,
             output_dir=training_args.output_dir,
         )
+        print("check cat_offsets", cat_offsets)
+
+    # X_num = np.load(data_args.data_path + "/X_num.npy")
+    # num_means = np.nanmean(X_num, axis=0)
+    # nan_indices = np.isnan(X_num)
+    # X_num[nan_indices] = np.take(num_means, nan_indices.nonzero()[1])
+    # scaler = StandardScaler()
+    # X_num = scaler.fit_transform(X_num)
+
+    # # X_bin = np.concatenate((np.load(data_args.data_path + "/X_bin.npy").astype(int), np.load(data_args.data_path + "/X_cat.npy").astype(int)), axis=1)
+    # X_bin = np.load(data_args.data_path + "/X_bin.npy").astype(int)
+    # # X_bin = np.load(data_args.data_path + "/X_cat.npy").astype(int)
+    # num_bin = X_bin.shape[1]
+    # cat_offsets = [X_bin[:,i].max() + 1 for i in range(num_bin)]
+    # cat_offsets = [0] + cat_offsets
+    # cat_offsets = np.cumsum(cat_offsets)
+    # X_bin = X_bin + cat_offsets[:-1]
+
+    # Y = np.load(data_args.data_path + "/Y.npy")
+    # train_idx = np.load(data_args.data_path + "/split-default/train_idx.npy")
+    # val_idx = np.load(data_args.data_path + "/split-default/val_idx.npy")
+    # test_idx = np.load(data_args.data_path + "/split-default/test_idx.npy")
+
+    # train_datasets = (TorchTabularTextDataset(
+    #     encodings=None,
+    #     categorical_feats=X_bin[train_idx],
+    #     numerical_feats=X_num[train_idx],
+    #     labels=Y[train_idx],
+    #     df=None,
+    #     label_list=None,
+    # ),)
+    # val_datasets = (TorchTabularTextDataset(
+    #     encodings=None,
+    #     categorical_feats=X_bin[val_idx],
+    #     numerical_feats=X_num[val_idx],
+    #     labels=Y[val_idx],
+    #     df=None,
+    #     label_list=None,
+    # ),)
+    # test_datasets = (TorchTabularTextDataset(
+    #     encodings=None,
+    #     categorical_feats=X_bin[test_idx],
+    #     numerical_feats=X_num[test_idx],
+    #     labels=Y[test_idx],
+    #     df=None,
+    #     label_list=None,
+    # ),)
+
     train_dataset = train_datasets[0]
 
     set_seed(training_args.seed)
@@ -156,6 +195,7 @@ def main():
         def compute_metrics_fn(p: EvalPrediction):
             # p.predictions is now a list of objects
             # The first entry is the actual predictions
+            # print("dbg predictions", p.predictions[0].shape)
             predictions = p.predictions[0]
             if task_name == "classification":
                 preds_labels = np.argmax(predictions, axis=1)
@@ -187,6 +227,9 @@ def main():
             ),
             cache_dir=model_args.cache_dir,
         )
+        print("cat_feats", train_dataset.cat_feats.shape)
+        print("numerical_feats", train_dataset.numerical_feats.shape)
+        print("labels", train_dataset.labels.shape)
         tabular_config = TabularConfig(
             num_labels=num_labels,
             cat_feat_dim=(
@@ -199,18 +242,14 @@ def main():
                 if train_dataset.numerical_feats is not None
                 else 0
             ),
+            cat_offsets=cat_offsets,
+            num_feats=train_dataset.cat_feats.shape[1]+train_dataset.numerical_feats.shape[1],
             **vars(data_args),
         )
         config.tabular_config = tabular_config
 
-        model = AutoModelWithTabular.from_pretrained(
-            (
-                model_args.config_name
-                if model_args.config_name
-                else model_args.model_name_or_path
-            ),
-            config=config,
-            cache_dir=model_args.cache_dir,
+        model = AutoModelWithTabular.from_config(
+            config=config
         )
         if i == 0:
             logger.info(tabular_config)
@@ -252,40 +291,40 @@ def main():
 
             eval_results.update(eval_result)
 
-        if training_args.do_predict:
-            logging.info("*** Test ***")
+        # if training_args.do_predict:
+        #     logging.info("*** Test ***")
 
-            predictions = trainer.predict(test_dataset=test_dataset).predictions[0]
-            output_test_file = os.path.join(
-                training_args.output_dir, f"test_results_{task}_fold_{i+1}.txt"
-            )
-            eval_result = trainer.evaluate(eval_dataset=test_dataset)
-            logger.info(pformat(eval_result, indent=4))
-            if trainer.is_world_process_zero():
-                with open(output_test_file, "w") as writer:
-                    logger.info("***** Test results {} *****".format(task))
-                    writer.write("index\tprediction\n")
-                    if task == "classification":
-                        predictions = np.argmax(predictions, axis=1)
-                    for index, item in enumerate(predictions):
-                        if task == "regression":
-                            writer.write(
-                                "%d\t%3.3f\t%d\n"
-                                % (index, item, test_dataset.labels[index])
-                            )
-                        else:
-                            item = test_dataset.get_labels()[item]
-                            writer.write("%d\t%s\n" % (index, item))
-                output_test_file = os.path.join(
-                    training_args.output_dir,
-                    f"test_metric_results_{task}_fold_{i+1}.txt",
-                )
-                with open(output_test_file, "w") as writer:
-                    logger.info("***** Test results {} *****".format(task))
-                    for key, value in eval_result.items():
-                        logger.info("  %s = %s", key, value)
-                        writer.write("%s = %s\n" % (key, value))
-                eval_results.update(eval_result)
+        #     predictions = trainer.predict(test_dataset=test_dataset).predictions[0]
+        #     output_test_file = os.path.join(
+        #         training_args.output_dir, f"test_results_{task}_fold_{i+1}.txt"
+        #     )
+        #     eval_result = trainer.evaluate(eval_dataset=test_dataset)
+        #     logger.info(pformat(eval_result, indent=4))
+        #     if trainer.is_world_process_zero():
+        #         with open(output_test_file, "w") as writer:
+        #             logger.info("***** Test results {} *****".format(task))
+        #             writer.write("index\tprediction\n")
+        #             if task == "classification":
+        #                 predictions = np.argmax(predictions, axis=1)
+        #             for index, item in enumerate(predictions):
+        #                 if task == "regression":
+        #                     writer.write(
+        #                         "%d\t%3.3f\t%d\n"
+        #                         % (index, item, test_dataset.labels[index])
+        #                     )
+        #                 else:
+        #                     item = test_dataset.get_labels()[item]
+        #                     writer.write("%d\t%s\n" % (index, item))
+        #         output_test_file = os.path.join(
+        #             training_args.output_dir,
+        #             f"test_metric_results_{task}_fold_{i+1}.txt",
+        #         )
+        #         with open(output_test_file, "w") as writer:
+        #             logger.info("***** Test results {} *****".format(task))
+        #             for key, value in eval_result.items():
+        #                 logger.info("  %s = %s", key, value)
+        #                 writer.write("%s = %s\n" % (key, value))
+        #         eval_results.update(eval_result)
         del model
         del config
         del tabular_config

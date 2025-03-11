@@ -22,8 +22,10 @@ from .tabular_transformers import (
     XLNetWithTabular,
     XLMWithTabular,
     XLMRobertaWithTabular,
+    PtWithTabular,
 )
 
+from .configuration_pt import PtConfig
 
 MODEL_FOR_SEQUENCE_W_TABULAR_CLASSIFICATION_MAPPING = OrderedDict(
     [
@@ -35,6 +37,7 @@ MODEL_FOR_SEQUENCE_W_TABULAR_CLASSIFICATION_MAPPING = OrderedDict(
         (XLNetConfig, XLNetWithTabular),
         (XLMConfig, XLMWithTabular),
         (XLMRobertaConfig, XLMRobertaWithTabular),
+        (PtConfig, PtWithTabular),
     ]
 )
 

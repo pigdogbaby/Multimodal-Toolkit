@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from typing import List, Callable
 from sklearn import preprocessing
-from sklearn.preprocessing import PowerTransformer, QuantileTransformer
+from sklearn.preprocessing import PowerTransformer, QuantileTransformer, StandardScaler
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +49,18 @@ class CategoricalFeatures:
         self.ohe_handle_unknown = ohe_handle_unknown
 
     def _label_encoding(self, dataframe: pd.DataFrame):
+        cat_offsets = []
         for c in self.cat_cols:
             lbl = preprocessing.LabelEncoder()
-            lbl.fit(dataframe[c].values)
+            # additionally encode na_value
+            tmp = dataframe[c]
+            tmp.loc[len(tmp)] = self.na_value
+            lbl.fit(tmp.values)
             self.label_encoders[c] = lbl
+            # print("dbg", lbl.classes_)
+            cat_offsets.append(len(lbl.classes_))
+        # print("dbg cat_offsets", cat_offsets)
+        return cat_offsets
 
     def _label_binarization(self, dataframe: pd.DataFrame):
         for c in self.cat_cols:
@@ -83,8 +91,10 @@ class CategoricalFeatures:
     def fit(self, dataframe: pd.DataFrame):
         if self.handle_na:
             dataframe = self.nan_handler(dataframe)
+        # print("check2\n", dataframe.head())
+        # print(dataframe.columns)
         if self.enc_type == "label":
-            self._label_encoding(dataframe)
+            return self._label_encoding(dataframe)
         elif self.enc_type == "binary":
             self._label_binarization(dataframe)
         elif self.enc_type == "ohe":
@@ -161,54 +171,65 @@ class NumericalFeatures:
         self.handle_na = handle_na
         self.how_handle_na = how_handle_na
         self.na_value = na_value
+        self.scaler = StandardScaler()
 
     def nan_handler(self, dataframe: pd.DataFrame) -> pd.DataFrame:
-        dataframe.loc[:, self.num_cols] = dataframe[self.num_cols].astype(float)
-        if self.how_handle_na == "median":
-            dataframe.loc[:, self.num_cols] = dataframe[self.num_cols].fillna(
-                dict(dataframe[self.num_cols].median()), inplace=False
-            )
-        elif self.how_handle_na == "mean":
-            dataframe.loc[:, self.num_cols] = dataframe[self.num_cols].fillna(
-                dict(dataframe[self.num_cols].mean()), inplace=False
-            )
-        elif self.how_handle_na == "value":
-            dataframe.loc[:, self.num_cols] = dataframe[self.num_cols].fillna(
-                self.na_value, inplace=False
-            )
-        else:
-            raise ValueError(f"Unknown NaN handling method {self.how_handle_na}.")
+        dataframe.loc[:, self.num_cols] = dataframe[self.num_cols].astype(float).fillna(
+            dict(dataframe[self.num_cols].mean()), inplace=False
+        )
+        # if self.how_handle_na == "median":
+        #     dataframe.loc[:, self.num_cols] = dataframe[self.num_cols].fillna(
+        #         dict(dataframe[self.num_cols].median()), inplace=False
+        #     )
+        # elif self.how_handle_na == "mean":
+        #     dataframe.loc[:, self.num_cols] = dataframe[self.num_cols].fillna(
+        #         dict(dataframe[self.num_cols].mean()), inplace=False
+        #     )
+        # elif self.how_handle_na == "value":
+        #     dataframe.loc[:, self.num_cols] = dataframe[self.num_cols].fillna(
+        #         self.na_value, inplace=False
+        #     )
+        # else:
+        #     raise ValueError(f"Unknown NaN handling method {self.how_handle_na}.")
         return dataframe
 
     def fit(self, dataframe: pd.DataFrame):
-        if self.handle_na:
-            dataframe = self.nan_handler(dataframe)
+        dataframe = self.nan_handler(dataframe[self.num_cols])
+        print("fit")
+        self.scaler.fit(dataframe)
         # Build transformer
-        if self.numerical_transformer_method == "yeo_johnson":
-            self.numerical_transformer = PowerTransformer(method="yeo-johnson")
-        elif self.numerical_transformer_method == "box_cox":
-            self.numerical_transformer = PowerTransformer(method="box-cox")
-        elif self.numerical_transformer_method == "quantile_normal":
-            self.numerical_transformer = QuantileTransformer(
-                output_distribution="normal"
-            )
-        else:
-            raise ValueError(
-                f"preprocessing transformer method "
-                f"{self.numerical_transformer_method} not implemented"
-            )
+        # if self.numerical_transformer_method == "yeo_johnson":
+        #     self.numerical_transformer = PowerTransformer(method="yeo-johnson")
+        # elif self.numerical_transformer_method == "box_cox":
+        #     self.numerical_transformer = PowerTransformer(method="box-cox")
+        # elif self.numerical_transformer_method == "quantile_normal":
+        #     self.numerical_transformer = QuantileTransformer(
+        #         output_distribution="normal"
+        #     )
+        # else:
+        #     raise ValueError(
+        #         f"preprocessing transformer method "
+        #         f"{self.numerical_transformer_method} not implemented"
+        #     )
         # Fit transformer
-        num_feats = dataframe[self.num_cols]
-        self.numerical_transformer.fit(num_feats)
+        # num_feats = dataframe[self.num_cols]
+        # missing_values_count = (num_feats == '?').sum().sum()
+        # print(missing_values_count)
+        # self.numerical_transformer.fit(num_feats)
 
     def fit_transform(self, dataframe: pd.DataFrame) -> pd.DataFrame:
         self.fit(dataframe)
         return self.transform(dataframe)
 
     def transform(self, dataframe: pd.DataFrame) -> pd.DataFrame:
-        if self.handle_na:
-            dataframe = self.nan_handler(dataframe)
-        return self.numerical_transformer.transform(dataframe[self.num_cols])
+        print("detect nan", np.any(np.isnan(dataframe[self.num_cols])))
+        dataframe = self.nan_handler(dataframe[self.num_cols])
+        print("transform", dataframe.head())
+        stand_data = self.scaler.transform(dataframe)
+        stand_dataframe = pd.DataFrame(stand_data, columns=dataframe.columns, index=dataframe.index)
+        print("check StandardScaler", stand_dataframe.head())
+        # return self.numerical_transformer.transform(dataframe[self.num_cols])
+        return stand_dataframe
 
 
 def change_name_func(x: str) -> str:

@@ -6,6 +6,7 @@ from .tabular_transformers import (
     RobertaWithTabular,
     DistilBertWithTabular,
     LongformerWithTabular,
+    PtWithTabular,
 )
 
 
@@ -17,4 +18,12 @@ __all__ = [
     "RobertaWithTabular",
     "DistilBertWithTabular",
     "LongformerWithTabular",
+    "PtWithTabular",
 ]
+
+from .configuration_pt import PtConfig
+from .modeling_pt import PtModel, PtForMaskedLM
+from transformers import AutoConfig, AutoModel, AutoModelForMaskedLM
+AutoConfig.register("pt", PtConfig)
+AutoModel.register(PtConfig, PtModel)
+# AutoModelForMaskedLM.register(PtConfig, PtForMaskedLM)

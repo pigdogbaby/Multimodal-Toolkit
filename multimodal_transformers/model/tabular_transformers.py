@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from transformers import (
     BertForSequenceClassification,
-    RobertaForSequenceClassification,
+    RobertaPreTrainedModel,
     DistilBertForSequenceClassification,
     AlbertForSequenceClassification,
     XLNetForSequenceClassification,
@@ -27,6 +27,8 @@ from .tabular_combiner import TabularFeatCombiner
 from .tabular_config import TabularConfig
 from .layer_utils import MLP, calc_mlp_dims, hf_loss_func
 
+from .modeling_roberta import RobertaModel
+from.modeling_pt import PtModel, PtPreTrainedModel
 
 class BertWithTabular(BertForSequenceClassification):
     """
@@ -136,7 +138,7 @@ class BertWithTabular(BertForSequenceClassification):
         return loss, logits, classifier_layer_outputs
 
 
-class RobertaWithTabular(RobertaForSequenceClassification):
+class RobertaWithTabular(RobertaPreTrainedModel):
     """
     Roberta Model transformer with a sequence classification/regression head as well as
     a TabularFeatCombiner module to combine categorical and numerical features
@@ -151,6 +153,7 @@ class RobertaWithTabular(RobertaForSequenceClassification):
 
     def __init__(self, hf_model_config):
         super().__init__(hf_model_config)
+        self.model = RobertaModel(hf_model_config, add_pooling_layer=False)
         tabular_config = hf_model_config.tabular_config
         if type(tabular_config) is dict:  # when loading from saved model
             tabular_config = TabularConfig(**tabular_config)
@@ -166,7 +169,7 @@ class RobertaWithTabular(RobertaForSequenceClassification):
         self.dropout = nn.Dropout(hf_model_config.hidden_dropout_prob)
         if tabular_config.use_simple_classifier:
             self.tabular_classifier = nn.Linear(
-                combined_feat_dim, tabular_config.num_labels
+                hf_model_config.hidden_size, tabular_config.num_labels
             )
         else:
             dims = calc_mlp_dims(
@@ -222,21 +225,23 @@ class RobertaWithTabular(RobertaForSequenceClassification):
                 combining module's output
 
         """
-        outputs = self.roberta(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask,
-            inputs_embeds=inputs_embeds,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
+        # print("input_ids", input_ids)
+        # print("attention_mask", attention_mask)
+        # print("token_type_ids", token_type_ids)
+        # print("input_ids", input_ids)
+        # print("inputs_embeds", inputs_embeds)
+        # print("labels", labels)
+        # print("cat_feats", cat_feats)
+        # print("numerical_feats", numerical_feats)
+        outputs = self.model(
+            cat_feats=cat_feats,
+            numerical_feats=numerical_feats,
         )
 
         sequence_output = outputs[0]
-        text_feats = sequence_output[:, 0, :]
-        text_feats = self.dropout(text_feats)
-        combined_feats = self.tabular_combiner(text_feats, cat_feats, numerical_feats)
+        # print("sequence_output.size()", sequence_output.size())
+        combined_feats = sequence_output[:, 0, :]
+        combined_feats = self.dropout(combined_feats)
         loss, logits, classifier_layer_outputs = hf_loss_func(
             combined_feats,
             self.tabular_classifier,
@@ -244,8 +249,125 @@ class RobertaWithTabular(RobertaForSequenceClassification):
             self.num_labels,
             self.class_weights,
         )
+        print("dbg forward")
+        print(loss.shape, logits.shape, classifier_layer_outputs.shape)
         return loss, logits, classifier_layer_outputs
 
+class PtWithTabular(PtPreTrainedModel):
+    """
+    Roberta Model transformer with a sequence classification/regression head as well as
+    a TabularFeatCombiner module to combine categorical and numerical features
+    with the Roberta pooled output
+
+    Parameters:
+        hf_model_config (:class:`~transformers.RobertaConfig`):
+            Model configuration class with all the parameters of the model.
+            This object must also have a tabular_config member variable that is a
+            :obj:`TabularConfig` instance specifying the configs for :obj:`TabularFeatCombiner`
+    """
+
+    def __init__(self, hf_model_config):
+        super().__init__(hf_model_config)
+        self.model = PtModel(hf_model_config)
+        tabular_config = hf_model_config.tabular_config
+        if type(tabular_config) is dict:  # when loading from saved model
+            tabular_config = TabularConfig(**tabular_config)
+        else:
+            self.config.tabular_config = tabular_config.__dict__
+
+        self.class_weights = tabular_config.class_weights
+        tabular_config.text_feat_dim = hf_model_config.hidden_size
+        tabular_config.hidden_dropout_prob = hf_model_config.dropout_prob_z
+        self.tabular_combiner = TabularFeatCombiner(tabular_config)
+        self.num_labels = tabular_config.num_labels
+        combined_feat_dim = self.tabular_combiner.final_out_dim
+        self.dropout = nn.Dropout(hf_model_config.dropout_prob_z)
+        if tabular_config.use_simple_classifier:
+            self.tabular_classifier = nn.Linear(
+                hf_model_config.hidden_size, tabular_config.num_labels
+            )
+        else:
+            dims = calc_mlp_dims(
+                combined_feat_dim,
+                division=tabular_config.mlp_division,
+                output_dim=tabular_config.num_labels,
+            )
+            self.tabular_classifier = MLP(
+                combined_feat_dim,
+                tabular_config.num_labels,
+                num_hidden_lyr=len(dims),
+                dropout_prob=tabular_config.mlp_dropout,
+                hidden_channels=dims,
+                bn=True,
+            )
+
+    @add_start_docstrings_to_model_forward(
+        ROBERTA_INPUTS_DOCSTRING.format("(batch_size, sequence_length)")
+    )
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        cat_feats=None,
+        numerical_feats=None,
+    ):
+        r"""
+            labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`, defaults to :obj:`None`):
+                Labels for computing the sequence classification/regression loss.
+                Indices should be in :obj:`[0, ..., config.num_labels - 1]`.
+                If :obj:`tabular_config.num_labels == 1` a regression loss is computed (Mean-Square loss),
+                If :obj:`tabular_config.num_labels > 1` a classification loss is computed (Cross-Entropy).
+            cat_feats (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, tabular_config.cat_feat_dim)`, `optional`, defaults to :obj:`None`):
+                Categorical features to be passed in to the TabularFeatCombiner
+            numerical_feats (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, tabular_config.numerical_feat_dim)`, `optional`, defaults to :obj:`None`):
+                Numerical features to be passed in to the TabularFeatCombiner
+
+        Returns:
+            :obj:`tuple` comprising various elements depending on configuration and inputs:
+            loss (:obj:`torch.FloatTensor` of shape :obj:`(1,)`, `optional`, returned when :obj:`label` is provided):
+                Classification (or regression if tabular_config.num_labels==1) loss.
+            logits (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, tabular_config.num_labels)`):
+                Classification (or regression if tabular_config.num_labels==1) scores (before SoftMax).
+            classifier_layer_outputs(:obj:`list` of :obj:`torch.FloatTensor`):
+                The outputs of each layer of the final classification layers. The 0th index of this list is the
+                combining module's output
+
+        """
+        # print("input_ids", input_ids)
+        # print("attention_mask", attention_mask)
+        # print("token_type_ids", token_type_ids)
+        # print("input_ids", input_ids)
+        # print("inputs_embeds", inputs_embeds)
+        # print("labels", labels)
+        # print("cat_feats", cat_feats)
+        # print("numerical_feats", numerical_feats)
+        outputs = self.model(
+            cat_feats=cat_feats,
+            numerical_feats=numerical_feats,
+        )
+
+        sequence_output = outputs[0]
+        # print("sequence_output.size()", sequence_output.size())
+        combined_feats = sequence_output[:, 0, :]
+        combined_feats = self.dropout(combined_feats)
+        loss, logits, classifier_layer_outputs = hf_loss_func(
+            combined_feats,
+            self.tabular_classifier,
+            labels,
+            self.num_labels,
+            self.class_weights,
+        )
+        # print("dbg loss", loss)
+        # print("dbg logits", logits)
+        # print("dbg classifier_layer_outputs", classifier_layer_outputs)
+        return loss, logits, classifier_layer_outputs
 
 class XLMRobertaWithTabular(RobertaWithTabular):
     """

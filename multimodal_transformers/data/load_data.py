@@ -23,6 +23,52 @@ from .tabular_torch_dataset import TorchTabularTextDataset
 logger = logging.getLogger(__name__)
 
 
+def load_data_tabred(
+    data_csv_path: str,
+) -> Tuple[
+    List[TorchTabularTextDataset],
+    List[Optional[TorchTabularTextDataset]],
+    List[TorchTabularTextDataset],
+    List[int]
+]:
+    X_num = np.load(data_csv_path + "/X_num.npy")
+    X_bin = np.load(data_csv_path + "/X_bin.npy")
+    Y = np.load(data_csv_path + "/Y.npy")
+    train_idx = np.load(data_csv_path + "/split-default/train_idx.npy")
+    val_idx = np.load(data_csv_path + "/split-default/val_idx.npy")
+    test_idx = np.load(data_csv_path + "/split-default/test_idx.npy")
+
+    train_datasets = TorchTabularTextDataset(
+        encodings=None,
+        categorical_feats=X_bin[train_idx],
+        numerical_feats=X_num[train_idx],
+        labels=Y[train_idx],
+        df=None,
+        label_list=None,
+    )
+    val_datasets = TorchTabularTextDataset(
+        encodings=None,
+        categorical_feats=X_bin[val_idx],
+        numerical_feats=X_num[val_idx],
+        labels=Y[val_idx],
+        df=None,
+        label_list=None,
+    )
+    test_datasets = TorchTabularTextDataset(
+        encodings=None,
+        categorical_feats=X_bin[test_idx],
+        numerical_feats=X_num[test_idx],
+        labels=Y[test_idx],
+        df=None,
+        label_list=None,
+    )
+    train_splits = (train_datasets, )
+    val_splits = (val_datasets, )
+    test_splits = (test_datasets, )
+    num_bin = X_bin.shape[1]
+    cat_offsets = [i * 2 for i in range(num_bin)]
+    return train_splits, val_splits, test_splits, cat_offsets
+
 def load_data_into_folds(
     data_csv_path: str,
     num_splits: int,
@@ -52,6 +98,7 @@ def load_data_into_folds(
     List[TorchTabularTextDataset],
     List[Optional[TorchTabularTextDataset]],
     List[TorchTabularTextDataset],
+    List[int]
 ]:
     """
     Load tabular and text data from a specified folder into folds.
@@ -145,26 +192,20 @@ def load_data_into_folds(
     """
 
     assert 0 <= validation_ratio <= 1, "validation ratio needs to be between 0 and 1"
-    all_data_df = pd.read_csv(data_csv_path)
-    folds_df, val_df = train_test_split(
-        all_data_df,
-        test_size=validation_ratio,
-        shuffle=True,
-        train_size=1 - validation_ratio,
-        random_state=5,
-    )
+    print("validation_ratio", validation_ratio)
+    folds_df = pd.read_csv(data_csv_path, skipinitialspace=True)
     kfold = KFold(num_splits, shuffle=True, random_state=5)
 
-    train_splits, val_splits, test_splits = [], [], []
+    train_splits, val_splits, test_splits, cat_offsets = [], [], [], []
 
-    for train_index, test_index in kfold.split(folds_df):
+    for train_index, val_index in kfold.split(folds_df):
         train_df = folds_df.copy().iloc[train_index]
-        test_df = folds_df.copy().iloc[test_index]
+        val_df = folds_df.copy().iloc[val_index]
 
-        train, val, test = load_train_val_test_helper(
+        train, val, test, cat_offsets = load_train_val_test_helper(
             train_df=train_df,
-            val_df=val_df.copy(),
-            test_df=test_df,
+            val_df=val_df,
+            test_df=None,
             text_cols=text_cols,
             tokenizer=tokenizer,
             label_col=label_col,
@@ -191,7 +232,7 @@ def load_data_into_folds(
         val_splits.append(val)
         test_splits.append(test)
 
-    return train_splits, val_splits, test_splits
+    return train_splits, val_splits, test_splits, cat_offsets
 
 
 def load_data_from_folder(
@@ -371,11 +412,12 @@ def load_train_val_test_helper(
 ) -> Tuple[
     TorchTabularTextDataset, Optional[TorchTabularTextDataset], TorchTabularTextDataset
 ]:
-    if categorical_encode_type == "ohe" or categorical_encode_type == "binary":
+    if categorical_encode_type == "ohe" or categorical_encode_type == "binary" or categorical_encode_type == "label":
         # Combine all DFs so that we don't run into encoding errors with the
         # test or validation sets
         dfs = [df for df in [train_df, val_df, test_df] if df is not None]
         data_df = pd.concat(dfs, axis=0).reset_index(drop=False)
+        # print("check1\n", data_df.head())
 
         # Build feature encoder
         categorical_transformer = CategoricalFeatures(
@@ -385,7 +427,7 @@ def load_train_val_test_helper(
             na_value=categorical_na_value,
             ohe_handle_unknown=ohe_handle_unknown,
         )
-        categorical_transformer.fit(data_df)
+        cat_offsets = categorical_transformer.fit(data_df)
     else:
         categorical_transformer = None
 
@@ -417,24 +459,29 @@ def load_train_val_test_helper(
         max_token_length=max_token_length,
         debug=debug,
         debug_dataset_size=debug_dataset_size,
+        cat_offsets=cat_offsets,
     )
-    test_dataset = load_data(
-        data_df=test_df,
-        text_cols=text_cols,
-        tokenizer=tokenizer,
-        label_col=label_col,
-        label_list=label_list,
-        categorical_cols=categorical_cols,
-        numerical_cols=numerical_cols,
-        sep_text_token_str=sep_text_token_str,
-        categorical_transformer=categorical_transformer,
-        numerical_transformer=numerical_transformer,
-        empty_text_values=empty_text_values,
-        replace_empty_text=replace_empty_text,
-        max_token_length=max_token_length,
-        debug=debug,
-        debug_dataset_size=debug_dataset_size,
-    )
+    if test_df is not None:
+        test_dataset = load_data(
+            data_df=test_df,
+            text_cols=text_cols,
+            tokenizer=tokenizer,
+            label_col=label_col,
+            label_list=label_list,
+            categorical_cols=categorical_cols,
+            numerical_cols=numerical_cols,
+            sep_text_token_str=sep_text_token_str,
+            categorical_transformer=categorical_transformer,
+            numerical_transformer=numerical_transformer,
+            empty_text_values=empty_text_values,
+            replace_empty_text=replace_empty_text,
+            max_token_length=max_token_length,
+            debug=debug,
+            debug_dataset_size=debug_dataset_size,
+            cat_offsets=cat_offsets,
+        )
+    else:
+        test_dataset = None
 
     if val_df is not None:
         val_dataset = load_data(
@@ -453,28 +500,29 @@ def load_train_val_test_helper(
             max_token_length=max_token_length,
             debug=debug,
             debug_dataset_size=debug_dataset_size,
+            cat_offsets=cat_offsets,
         )
     else:
         val_dataset = None
 
     # Save transformers and datasets if an output dir is specified
-    if output_dir:
-        makedirs(output_dir, exist_ok=True)
-        if numerical_transformer:
-            joblib.dump(
-                numerical_transformer,
-                join(output_dir, "numerical_transformer.pkl"),
-            )
-        if categorical_transformer:
-            joblib.dump(
-                categorical_transformer, join(output_dir, "categorical_transformer.pkl")
-            )
-        torch.save(train_dataset, join(output_dir, "train_data.pt"))
-        torch.save(test_dataset, join(output_dir, "test_data.pt"))
-        if val_dataset:
-            torch.save(val_dataset, join(output_dir, "val_data.pt"))
+    # if output_dir:
+    #     makedirs(output_dir, exist_ok=True)
+    #     if numerical_transformer:
+    #         joblib.dump(
+    #             numerical_transformer,
+    #             join(output_dir, "numerical_transformer.pkl"),
+    #         )
+    #     if categorical_transformer:
+    #         joblib.dump(
+    #             categorical_transformer, join(output_dir, "categorical_transformer.pkl")
+    #         )
+    #     torch.save(train_dataset, join(output_dir, "train_data.pt"))
+    #     torch.save(test_dataset, join(output_dir, "test_data.pt"))
+    #     if val_dataset:
+    #         torch.save(val_dataset, join(output_dir, "val_data.pt"))
 
-    return train_dataset, val_dataset, test_dataset
+    return train_dataset, val_dataset, test_dataset, cat_offsets
 
 
 def build_categorical_features(
@@ -532,6 +580,7 @@ def build_text_features(
 def load_data(
     data_df: pd.DataFrame,
     text_cols: List[str],
+    cat_offsets: List[int],
     tokenizer: transformers.PreTrainedTokenizer,
     label_col: Optional[str] = None,
     label_list: Optional[List[str]] = [],
@@ -608,36 +657,44 @@ def load_data(
         categorical_cols=categorical_cols,
         categorical_transformer=categorical_transformer,
     )
+    cat_offsets = [0] + cat_offsets
+    cat_offsets = np.cumsum(cat_offsets)
+    categorical_feats = categorical_feats.astype(int) + cat_offsets[:-1]
+
+    # print("categorical_feats\n", categorical_feats)
     # Build numerical features
     numerical_feats = build_numerical_features(
         data_df=data_df,
         numerical_cols=numerical_cols,
         numerical_transformer=numerical_transformer,
     )
+    numerical_feats = numerical_feats.to_numpy().astype(float)
+    # print("numerical_feats\n", numerical_feats)
 
     # Build text features
-    texts_list = build_text_features(
-        data_df, text_cols, empty_text_values, replace_empty_text, sep_text_token_str
-    )
+    # texts_list = build_text_features(
+    #     data_df, text_cols, empty_text_values, replace_empty_text, sep_text_token_str
+    # )
 
     # Create tokenized text features
-    hf_model_text_input = tokenizer(
-        texts_list, padding=True, truncation=True, max_length=max_token_length
-    )
+    # hf_model_text_input = tokenizer(
+    #     texts_list, padding=True, truncation=True, max_length=max_token_length
+    # )
 
-    tokenized_text_ex = " ".join(
-        tokenizer.convert_ids_to_tokens(hf_model_text_input["input_ids"][0])
-    )
-    logger.debug(f"Tokenized text example: {tokenized_text_ex}")
+    # tokenized_text_ex = " ".join(
+    #     tokenizer.convert_ids_to_tokens(hf_model_text_input["input_ids"][0])
+    # )
+    # logger.debug(f"Tokenized text example: {tokenized_text_ex}")
 
     # Setup labels, if any
     if label_col:
         labels = data_df[label_col].values
+        labels = np.array([1 if x == ">50K" else 0 for x in labels]).astype(int)
     else:
         labels = None
 
     return TorchTabularTextDataset(
-        encodings=hf_model_text_input,
+        encodings=None,
         categorical_feats=categorical_feats,
         numerical_feats=numerical_feats,
         labels=labels,
