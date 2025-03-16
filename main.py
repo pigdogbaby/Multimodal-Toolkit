@@ -17,7 +17,7 @@ from transformers import (
     set_seed,
 )
 
-from evaluation import calc_classification_metrics, calc_regression_metrics
+from evaluation import calc_classification_metrics, calc_regression_metrics, calc_imputation_metrics
 from multimodal_transformers.data import load_data_from_folder, load_data_into_folds, TorchTabularTextDataset
 from multimodal_transformers.model import AutoModelWithTabular, TabularConfig
 from multimodal_transformers.multimodal_arguments import (
@@ -195,22 +195,31 @@ def main():
         def compute_metrics_fn(p: EvalPrediction):
             # p.predictions is now a list of objects
             # The first entry is the actual predictions
+
+            # I see, prediction = (logits, classifier_layer_outputs)!
             # print("dbg predictions", p.predictions[0].shape)
-            predictions = p.predictions[0]
-            if task_name == "classification":
-                preds_labels = np.argmax(predictions, axis=1)
-                if predictions.shape[-1] == 2:
-                    pred_scores = softmax(predictions, axis=1)[:, 1]
-                else:
-                    pred_scores = softmax(predictions, axis=1)
-                return calc_classification_metrics(
-                    pred_scores, preds_labels, p.label_ids
-                )
-            elif task_name == "regression":
-                preds = np.squeeze(predictions)
-                return calc_regression_metrics(preds, p.label_ids)
-            else:
-                return {}
+            # print("p.predictions[1].shape")
+            # for i in p.predictions[1]:
+            #     print(i.shape)
+
+            # predictions = p.predictions[0]
+            # if task_name == "classification":
+            #     preds_labels = np.argmax(predictions, axis=1)
+            #     if predictions.shape[-1] == 2:
+            #         pred_scores = softmax(predictions, axis=1)[:, 1]
+            #     else:
+            #         pred_scores = softmax(predictions, axis=1)
+            #     return calc_classification_metrics(
+            #         pred_scores, preds_labels, p.label_ids
+            #     )
+            # elif task_name == "regression":
+            #     preds = np.squeeze(predictions)
+            #     return calc_regression_metrics(preds, p.label_ids)
+            # else:
+            #     return {}
+            cat_logits, cat_labels, numerical_logits, numerical_labels = p.predictions[1]
+            # print("metric", cat_labels[0])
+            return calc_imputation_metrics(cat_logits, cat_labels, numerical_logits, numerical_labels)
 
         return compute_metrics_fn
 

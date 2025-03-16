@@ -146,3 +146,32 @@ def hf_loss_func(inputs, classifier, labels, num_labels, class_weights):
         return None, logits, layer_outputs
 
     return loss, logits, layer_outputs
+
+def hf_loss_func_impute(inputs, classifier, cat_feats, numerical_feats, cat_offsets, cat_heads, numerical_heads, cat_mask, numerical_mask):
+    logits = classifier(inputs[:, 0, :])
+    loss = torch.tensor(0, dtype=torch.float32, device=inputs.device)
+    cat_feat_dim = len(cat_offsets)
+
+    cat_logits = []
+    cat_labels = []
+    ce = CrossEntropyLoss()
+    for i, cat_head in enumerate(cat_heads):
+        cat_logit = cat_head(inputs[:, i, :][cat_mask[:, i]]).view(-1, cat_offsets[i] - 1)
+        cat_label = cat_feats[:, i][cat_mask[:, i]].view(-1)
+        cat_logits.append(cat_logit)
+        cat_labels.append(cat_label)
+        # print("ce", i, cat_logit.shape, torch.unique(cat_label))
+        loss += ce(cat_logit, cat_label)
+
+    numerical_logits = []
+    numerical_labels = []
+    mse = MSELoss()
+    for i, numerical_head in enumerate(numerical_heads):
+        numerical_logit = numerical_head(inputs[:, i + cat_feat_dim, :][numerical_mask[:, i]]).view(-1)
+        numerical_label = numerical_feats[:, i][numerical_mask[:, i]].view(-1)
+        numerical_logits.append(numerical_logit)
+        numerical_labels.append(numerical_label)
+        # print("mse", i, numerical_logit.shape, numerical_label.shape)
+        loss += mse(numerical_logit, numerical_label)
+
+    return loss, logits, (cat_logits, cat_labels, numerical_logits, numerical_labels)

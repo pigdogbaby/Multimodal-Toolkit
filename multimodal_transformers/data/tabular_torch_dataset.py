@@ -37,15 +37,17 @@ class TorchTabularTextDataset(TorchDataset):
         # categorical_feats: Optional[pd.DataFrame],
         categorical_feats: Optional[np.ndarray],
         numerical_feats: Optional[np.ndarray],
+        numerical_labels: Optional[np.ndarray],
         labels: Optional[Union[List, np.ndarray]] = None,
         df: Optional[pd.DataFrame] = None,
         label_list: Optional[List[Union[str]]] = None,
     ):
         self.df = df
         self.encodings = encodings
-        self.cat_feats = categorical_feats.values if categorical_feats is not None else None
-        # self.cat_feats = categorical_feats if categorical_feats is not None else None
+        # self.cat_feats = categorical_feats.values if categorical_feats is not None else None
+        self.cat_feats = categorical_feats if categorical_feats is not None else None
         self.numerical_feats = numerical_feats
+        self.numerical_labels = numerical_labels
         self.labels = labels
         self.label_list = (
             label_list
@@ -66,6 +68,11 @@ class TorchTabularTextDataset(TorchDataset):
         item["numerical_feats"] = (
             torch.tensor(self.numerical_feats[idx]).float()
             if self.numerical_feats is not None
+            else torch.zeros(0)
+        )
+        item["numerical_labels"] = (
+            torch.tensor(self.numerical_labels[idx]).float()
+            if self.numerical_labels is not None
             else torch.zeros(0)
         )
         return item

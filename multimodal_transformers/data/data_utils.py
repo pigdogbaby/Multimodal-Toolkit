@@ -44,7 +44,7 @@ class CategoricalFeatures:
         self.binary_encoders = dict()
         self.ohe = None
         self.handle_na = handle_na
-        self.na_value = na_value
+        self.na_value = '-99999'
         self.feat_names = []
         self.ohe_handle_unknown = ohe_handle_unknown
 
@@ -57,7 +57,7 @@ class CategoricalFeatures:
             tmp.loc[len(tmp)] = self.na_value
             lbl.fit(tmp.values)
             self.label_encoders[c] = lbl
-            # print("dbg", lbl.classes_)
+            print("label_encoding_classes", np.unique(tmp.values), lbl.transform(np.unique(tmp.values)))
             cat_offsets.append(len(lbl.classes_))
         # print("dbg cat_offsets", cat_offsets)
         return cat_offsets

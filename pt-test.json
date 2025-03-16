@@ -30,5 +30,5 @@
   "output_qzs": false,
   "vocab_size": 32000,
   "hard": true,
-  "cpd": true
+  "cpd": false
 }

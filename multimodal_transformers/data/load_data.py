@@ -657,19 +657,24 @@ def load_data(
         categorical_cols=categorical_cols,
         categorical_transformer=categorical_transformer,
     )
+    print("dbg cat_offsets", cat_offsets)
     cat_offsets = [0] + cat_offsets
     cat_offsets = np.cumsum(cat_offsets)
-    categorical_feats = categorical_feats.astype(int) + cat_offsets[:-1]
+    categorical_feats = categorical_feats.to_numpy().astype(int) + cat_offsets[:-1]
+    for i in range(categorical_feats.shape[1]):
+        print("dbg categorical_feats", np.unique(categorical_feats[:, i]))
 
     # print("categorical_feats\n", categorical_feats)
     # Build numerical features
+    numerical_labels = data_df[numerical_cols].to_numpy().astype(float)
     numerical_feats = build_numerical_features(
         data_df=data_df,
         numerical_cols=numerical_cols,
         numerical_transformer=numerical_transformer,
     )
     numerical_feats = numerical_feats.to_numpy().astype(float)
-    # print("numerical_feats\n", numerical_feats)
+    # print("numerical_labels\n", numerical_labels[:10])
+    # print("numerical_feats\n", numerical_feats[:10])
 
     # Build text features
     # texts_list = build_text_features(
@@ -697,6 +702,7 @@ def load_data(
         encodings=None,
         categorical_feats=categorical_feats,
         numerical_feats=numerical_feats,
+        numerical_labels=numerical_labels,
         labels=labels,
         df=data_df,
         label_list=label_list,

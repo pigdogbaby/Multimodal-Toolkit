@@ -114,13 +114,13 @@ class PtHeadSelection(nn.Module):
         self.cpd = config.cpd
         if self.hard:
             if config.cpd:
-                self.ternary_factor_u1 = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.num_channels * self.ternary_rank))
+                self.ternary_factor_u1 = nn.Parameter(torch.empty(config.tabular_config.num_feats, self.num_channels * self.ternary_rank))
                 self.ternary_factor_u2 = nn.Parameter(torch.empty(self.dim_z, self.num_channels * self.ternary_rank))
-                self.ternary_factor_v1 = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.num_channels * self.ternary_rank))
+                self.ternary_factor_v1 = nn.Parameter(torch.empty(config.tabular_config.num_feats, self.num_channels * self.ternary_rank))
                 self.ternary_factor_v2 = nn.Parameter(torch.empty(self.dim_z, self.num_channels * self.ternary_rank))
             else:
-                self.ternary_factor_u = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.dim_z, self.num_channels * self.ternary_rank))
-                self.ternary_factor_v = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.dim_z, self.num_channels * self.ternary_rank))
+                self.ternary_factor_u = nn.Parameter(torch.empty(config.tabular_config.num_feats, self.dim_z, self.num_channels * self.ternary_rank))
+                self.ternary_factor_v = nn.Parameter(torch.empty(config.tabular_config.num_feats, self.dim_z, self.num_channels * self.ternary_rank))
         else:
             self.ternary_factor_u = nn.Parameter(torch.empty(self.num_channels * self.ternary_rank, self.dim_z))
             self.ternary_factor_v = nn.Parameter(torch.empty(self.num_channels * self.ternary_rank, self.dim_z))
@@ -355,10 +355,10 @@ class PtModel(PtPreTrainedModel):
         self.cat_embeddings = nn.Embedding(sum(config.tabular_config.cat_offsets), config.hidden_size)
         self.num_embeddings = nn.Parameter(torch.empty(config.tabular_config.numerical_feat_dim, config.hidden_size))
         self.num_bias = nn.Parameter(torch.empty(config.tabular_config.numerical_feat_dim, config.hidden_size))
-        self.cls_token = nn.Parameter(torch.empty(1, 1, config.hidden_size))
+        # self.cls_token = nn.Parameter(torch.empty(1, 1, config.hidden_size))
         nn.init.normal_(self.num_embeddings, mean=0.0, std=config.ternary_initializer_range)
         nn.init.normal_(self.num_bias, mean=0.0, std=config.ternary_initializer_range)
-        nn.init.normal_(self.cls_token, mean=0.0, std=config.ternary_initializer_range)
+        # nn.init.normal_(self.cls_token, mean=0.0, std=config.ternary_initializer_range)
         print("init num_embeddings cls_token")
         self.iterator = PtEncoderIterator(config)
         self.norm = POTENTIAL2ACT[config.potential_func_z](dim=-1, eps=config.potential_eps)
@@ -392,6 +392,7 @@ class PtModel(PtPreTrainedModel):
         return_dict: Optional[bool] = None,
         cat_feats = None,
         numerical_feats = None,
+        numerical_mask = None,
     ) -> Union[Tuple, PtModelOutput]:
         output_dependencies = output_dependencies if output_dependencies is not None else self.config.output_attentions
         output_qzs = (
@@ -410,9 +411,10 @@ class PtModel(PtPreTrainedModel):
         batch_size = cat_feats.size(0)
         cat_tensor = self.cat_embeddings(cat_feats)
         numerical_feats = rearrange(numerical_feats, 'b n -> b n 1')
-        num_tensor = numerical_feats * self.num_embeddings
-        cls_tensor = repeat(self.cls_token, '1 1 d -> b 1 d', b = batch_size)
-        unary_potentials = torch.cat((cat_tensor, num_tensor, cls_tensor), dim=1)
+        numerical_mask = rearrange(numerical_mask * 1.0, 'b n -> b n 1')
+        num_tensor = numerical_feats * self.num_embeddings + numerical_mask * self.num_bias
+        # cls_tensor = repeat(self.cls_token, '1 1 d -> b 1 d', b = batch_size)
+        unary_potentials = torch.cat((cat_tensor, num_tensor), dim=1)
         # if self.dbg < 2:
         #     self.dbg += 1
         #     print(self.dbg, unary_potentials.shape)

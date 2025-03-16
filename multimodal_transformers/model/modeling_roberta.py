@@ -164,26 +164,26 @@ class RobertaSelfAttention(nn.Module):
         self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.mode = 1
-        self.query = nn.Linear(config.hidden_size, self.all_head_size)
-        self.key = nn.Linear(config.hidden_size, self.all_head_size)
-        self.value = nn.Linear(config.hidden_size, self.all_head_size)
+        # self.mode = 1
+        # self.query = nn.Linear(config.hidden_size, self.all_head_size)
+        # self.key = nn.Linear(config.hidden_size, self.all_head_size)
+        # self.value = nn.Linear(config.hidden_size, self.all_head_size)
 
-        # self.mode = 2
-        # self.query = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, config.hidden_size, self.all_head_size))
-        # self.key = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, config.hidden_size, self.all_head_size))
-        # self.value = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, config.hidden_size, self.all_head_size))
-        # nn.init.normal_(self.query, mean=0.0, std=config.initializer_range)
-        # nn.init.normal_(self.key, mean=0.0, std=config.initializer_range)
-        # nn.init.normal_(self.value, mean=0.0, std=config.initializer_range)
+        self.mode = 2
+        self.query = nn.Parameter(torch.empty(config.tabular_config.num_feats, config.hidden_size, self.all_head_size))
+        self.key = nn.Parameter(torch.empty(config.tabular_config.num_feats, config.hidden_size, self.all_head_size))
+        self.value = nn.Parameter(torch.empty(config.tabular_config.num_feats, config.hidden_size, self.all_head_size))
+        nn.init.normal_(self.query, mean=0.0, std=config.initializer_range)
+        nn.init.normal_(self.key, mean=0.0, std=config.initializer_range)
+        nn.init.normal_(self.value, mean=0.0, std=config.initializer_range)
 
         # self.mode = 3
         # self.query = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
         # self.key = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
         # self.value = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
-        # self.query1 = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.all_head_size))
-        # self.key1 = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.all_head_size))
-        # self.value1 = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.all_head_size))
+        # self.query1 = nn.Parameter(torch.empty(config.tabular_config.num_feats, self.all_head_size))
+        # self.key1 = nn.Parameter(torch.empty(config.tabular_config.num_feats, self.all_head_size))
+        # self.value1 = nn.Parameter(torch.empty(config.tabular_config.num_feats, self.all_head_size))
         # nn.init.normal_(self.query, mean=0.0, std=config.initializer_range)
         # nn.init.normal_(self.key, mean=0.0, std=config.initializer_range)
         # nn.init.normal_(self.value, mean=0.0, std=config.initializer_range)
@@ -855,7 +855,7 @@ class RobertaModel(RobertaPreTrainedModel):
         self.cat_embeddings = nn.Embedding(sum(config.tabular_config.cat_offsets), config.hidden_size)
         self.num_embeddings = nn.Parameter(torch.randn(config.tabular_config.numerical_feat_dim, config.hidden_size))
         self.num_bias = nn.Parameter(torch.randn(config.tabular_config.numerical_feat_dim, config.hidden_size))
-        self.cls_token = nn.Parameter(torch.randn(1, 1, config.hidden_size))
+        # self.cls_token = nn.Parameter(torch.randn(1, 1, config.hidden_size))
 
         self.attn_implementation = config._attn_implementation
         self.position_embedding_type = config.position_embedding_type
@@ -901,6 +901,7 @@ class RobertaModel(RobertaPreTrainedModel):
         return_dict: Optional[bool] = None,
         cat_feats = None,
         numerical_feats = None,
+        numerical_mask = None,
     ) -> Union[Tuple[torch.Tensor], BaseModelOutputWithPoolingAndCrossAttentions]:
         r"""
         encoder_hidden_states  (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
@@ -935,12 +936,13 @@ class RobertaModel(RobertaPreTrainedModel):
 
         # print("cat_feats.size()", cat_feats.size())
         # print("numerical_feats.size()", numerical_feats.size())
-        batch_size = cat_feats.size(0)
+        # batch_size = cat_feats.size(0)
         cat_tensor = self.cat_embeddings(cat_feats)
         numerical_feats = rearrange(numerical_feats, 'b n -> b n 1')
-        num_tensor = numerical_feats * self.num_embeddings
-        cls_tensor = repeat(self.cls_token, '1 1 d -> b 1 d', b = batch_size)
-        input = torch.cat((cat_tensor, num_tensor, cls_tensor), dim=1)
+        numerical_mask = rearrange(numerical_mask * 1.0, 'b n -> b n 1')
+        num_tensor = numerical_feats * self.num_embeddings + numerical_mask * self.num_bias
+        # cls_tensor = repeat(self.cls_token, '1 1 d -> b 1 d', b = batch_size)
+        input = torch.cat((cat_tensor, num_tensor), dim=1)
         # if self.dbg < 5:
         #     self.dbg += 1
         #     print(input.shape)
