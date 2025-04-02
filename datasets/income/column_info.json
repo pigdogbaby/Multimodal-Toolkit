@@ -1,0 +1,25 @@
+{
+  "text_cols": [
+
+  ],
+  "cat_cols": [
+    "workclass",
+    "education",
+    "marital-status",
+    "occupation",
+    "relationship",
+    "race",
+    "sex",
+    "native-country"
+  ],
+  "num_cols": [
+    "age",
+    "fnlwgt",
+    "education-num",
+    "capital-gain",
+    "capital-loss",
+    "hours-per-week"
+  ],
+  "label_col": "income",
+  "label_list": ["0", "1"]
+}

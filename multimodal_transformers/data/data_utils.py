@@ -44,7 +44,7 @@ class CategoricalFeatures:
         self.binary_encoders = dict()
         self.ohe = None
         self.handle_na = handle_na
-        self.na_value = na_value
+        self.na_value = "-99999"
         self.feat_names = []
         self.ohe_handle_unknown = ohe_handle_unknown
 

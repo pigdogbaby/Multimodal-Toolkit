@@ -3,13 +3,13 @@ export WANDB_API_KEY=cf12a933e3e4edbc59fd0674ca4173fec75e11a4
 
 python main.py \
     --model_name_or_path None \
-    --config_name pt-test3.json \
-    --data_path datasets/income/income_evaluation.csv \
+    --config_name roberta-tiny.json \
+    --data_path datasets/income/income.csv \
     --column_info_path datasets/income/column_info.json \
-    --output_dir outputs/income/tmp \
-    --run_name pt-test3-2e_3 \
+    --output_dir outputs/income/mlp-tiny-5e_4 \
+    --run_name mlp-tiny-5e_4 \
     --overwrite_output_dir \
-    --report_to none \
+    --report_to wandb \
     --task classification \
     --create_folds \
     --categorical_encode_type label \
@@ -18,7 +18,7 @@ python main.py \
     --gradient_accumulation_steps 1 \
     --lr_scheduler_type cosine \
     --warmup_ratio 0.015 \
-    --learning_rate 2e-3 \
+    --learning_rate 5e-4 \
     --weight_decay 1e-1 \
     --do_train \
     --do_eval \

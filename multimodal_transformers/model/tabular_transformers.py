@@ -249,8 +249,8 @@ class RobertaWithTabular(RobertaPreTrainedModel):
             self.num_labels,
             self.class_weights,
         )
-        print("dbg forward")
-        print(loss.shape, logits.shape, classifier_layer_outputs.shape)
+        # print("dbg forward")
+        # print(loss.shape, logits.shape, classifier_layer_outputs.shape)
         return loss, logits, classifier_layer_outputs
 
 class PtWithTabular(PtPreTrainedModel):
