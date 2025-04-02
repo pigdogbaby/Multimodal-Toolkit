@@ -169,27 +169,27 @@ class RobertaSelfAttention(nn.Module):
         # self.key = nn.Linear(config.hidden_size, self.all_head_size)
         # self.value = nn.Linear(config.hidden_size, self.all_head_size)
 
-        self.mode = 2
-        self.query = nn.Parameter(torch.empty(config.tabular_config.num_feats, config.hidden_size, self.all_head_size))
-        self.key = nn.Parameter(torch.empty(config.tabular_config.num_feats, config.hidden_size, self.all_head_size))
-        self.value = nn.Parameter(torch.empty(config.tabular_config.num_feats, config.hidden_size, self.all_head_size))
-        nn.init.normal_(self.query, mean=0.0, std=config.initializer_range)
-        nn.init.normal_(self.key, mean=0.0, std=config.initializer_range)
-        nn.init.normal_(self.value, mean=0.0, std=config.initializer_range)
-
-        # self.mode = 3
-        # self.query = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
-        # self.key = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
-        # self.value = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
-        # self.query1 = nn.Parameter(torch.empty(config.tabular_config.num_feats, self.all_head_size))
-        # self.key1 = nn.Parameter(torch.empty(config.tabular_config.num_feats, self.all_head_size))
-        # self.value1 = nn.Parameter(torch.empty(config.tabular_config.num_feats, self.all_head_size))
+        # self.mode = 2
+        # self.query = nn.Parameter(torch.empty(config.tabular_config.num_feats, config.hidden_size, self.all_head_size))
+        # self.key = nn.Parameter(torch.empty(config.tabular_config.num_feats, config.hidden_size, self.all_head_size))
+        # self.value = nn.Parameter(torch.empty(config.tabular_config.num_feats, config.hidden_size, self.all_head_size))
         # nn.init.normal_(self.query, mean=0.0, std=config.initializer_range)
         # nn.init.normal_(self.key, mean=0.0, std=config.initializer_range)
         # nn.init.normal_(self.value, mean=0.0, std=config.initializer_range)
-        # nn.init.normal_(self.query1, mean=0.0, std=config.initializer_range)
-        # nn.init.normal_(self.key1, mean=0.0, std=config.initializer_range)
-        # nn.init.normal_(self.value1, mean=0.0, std=config.initializer_range)
+
+        self.mode = 3
+        self.query = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
+        self.key = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
+        self.value = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
+        self.query1 = nn.Parameter(torch.empty(config.tabular_config.num_feats, self.all_head_size))
+        self.key1 = nn.Parameter(torch.empty(config.tabular_config.num_feats, self.all_head_size))
+        self.value1 = nn.Parameter(torch.empty(config.tabular_config.num_feats, self.all_head_size))
+        nn.init.normal_(self.query, mean=0.0, std=config.initializer_range)
+        nn.init.normal_(self.key, mean=0.0, std=config.initializer_range)
+        nn.init.normal_(self.value, mean=0.0, std=config.initializer_range)
+        nn.init.normal_(self.query1, mean=0.0, std=config.initializer_range)
+        nn.init.normal_(self.key1, mean=0.0, std=config.initializer_range)
+        nn.init.normal_(self.value1, mean=0.0, std=config.initializer_range)
 
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
         self.position_embedding_type = position_embedding_type or getattr(

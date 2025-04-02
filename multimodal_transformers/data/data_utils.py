@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from typing import List, Callable
 from sklearn import preprocessing
-from sklearn.preprocessing import PowerTransformer, QuantileTransformer, StandardScaler
+from sklearn.preprocessing import PowerTransformer, QuantileTransformer, MinMaxScaler
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +53,9 @@ class CategoricalFeatures:
         for c in self.cat_cols:
             lbl = preprocessing.LabelEncoder()
             # additionally encode na_value
-            tmp = dataframe[c]
+            tmp = dataframe[c].astype(str)
             tmp.loc[len(tmp)] = self.na_value
-            lbl.fit(tmp.values)
+            lbl.fit((tmp.values))
             self.label_encoders[c] = lbl
             print("label_encoding_classes", np.unique(tmp.values), lbl.transform(np.unique(tmp.values)))
             cat_offsets.append(len(lbl.classes_))
@@ -109,6 +109,7 @@ class CategoricalFeatures:
         return self.transform(dataframe)
 
     def transform(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        dataframe = dataframe.astype(str)
         if self.handle_na:
             dataframe = self.nan_handler(dataframe)
 
@@ -171,11 +172,19 @@ class NumericalFeatures:
         self.handle_na = handle_na
         self.how_handle_na = how_handle_na
         self.na_value = na_value
-        self.scaler = StandardScaler()
+        self.scaler = MinMaxScaler()
+        self.means = None
 
     def nan_handler(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        print("dbg numerical nan_handler", np.isnan(dataframe[self.num_cols].values).sum(), dataframe[self.num_cols].values.size)
+        if self.means is None:
+            means = dataframe[self.num_cols].mean()
+            self.means = means
+        else:
+            means = self.means
+        print(means, means.tolist())        
         dataframe.loc[:, self.num_cols] = dataframe[self.num_cols].astype(float).fillna(
-            dict(dataframe[self.num_cols].mean()), inplace=False
+            dict(means), inplace=False
         )
         # if self.how_handle_na == "median":
         #     dataframe.loc[:, self.num_cols] = dataframe[self.num_cols].fillna(

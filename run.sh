@@ -1,15 +1,15 @@
-export WANDB_PROJECT=income-imputation
+export WANDB_PROJECT=income-imputation-minmax
 export WANDB_API_KEY=cf12a933e3e4edbc59fd0674ca4173fec75e11a4
 
 python main.py \
     --model_name_or_path None \
-    --config_name pt-test.json \
-    --data_path datasets/income/income_evaluation.csv \
+    --config_name pt-tiny.json \
+    --data_path datasets/income/income.csv \
     --column_info_path datasets/income/column_info.json \
-    --output_dir outputs/income-imputation/pt-test-hard-30ep-3e_3 \
-    --run_name pt-test-hard-30ep-3e_3 \
+    --output_dir outputs/income-imputation-minmax/pt-tiny-hard-30ep-3e_3 \
+    --run_name pt-tiny-hard-30ep-3e_3 \
     --overwrite_output_dir \
-    --report_to none \
+    --report_to wandb \
     --task classification \
     --create_folds \
     --categorical_encode_type label \

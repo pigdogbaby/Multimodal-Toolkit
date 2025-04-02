@@ -693,8 +693,7 @@ def load_data(
 
     # Setup labels, if any
     if label_col:
-        labels = data_df[label_col].values
-        labels = np.array([1 if x == ">50K" else 0 for x in labels]).astype(int)
+        labels = data_df[label_col].values.astype(int)
     else:
         labels = None
 
