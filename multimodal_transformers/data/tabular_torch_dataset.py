@@ -41,6 +41,8 @@ class TorchTabularTextDataset(TorchDataset):
         labels: Optional[Union[List, np.ndarray]] = None,
         df: Optional[pd.DataFrame] = None,
         label_list: Optional[List[Union[str]]] = None,
+        cat_mask: Optional[np.ndarray] = None,
+        numerical_mask: Optional[np.ndarray] = None,
     ):
         self.df = df
         self.encodings = encodings
@@ -54,6 +56,8 @@ class TorchTabularTextDataset(TorchDataset):
             if label_list is not None
             else [i for i in range(len(np.unique(labels)))]
         )
+        self.cat_mask = cat_mask
+        self.numerical_mask = numerical_mask
 
     def __getitem__(self, idx: int):
         item = {}
@@ -74,6 +78,14 @@ class TorchTabularTextDataset(TorchDataset):
             torch.tensor(self.numerical_labels[idx]).float()
             if self.numerical_labels is not None
             else torch.zeros(0)
+        )
+        item["cat_mask"] = (
+            torch.tensor(self.cat_mask[idx]).bool()
+            if self.cat_mask is not None else None
+        )
+        item["numerical_mask"] = (
+            torch.tensor(self.numerical_mask[idx]).bool()
+            if self.numerical_mask is not None else None
         )
         return item
 

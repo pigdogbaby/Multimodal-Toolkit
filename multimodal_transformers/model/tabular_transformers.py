@@ -219,6 +219,8 @@ class RobertaWithTabular(RobertaPreTrainedModel):
         cat_feats=None,
         numerical_feats=None,
         numerical_labels=None,
+        cat_mask=None,
+        numerical_mask=None,
     ):
         r"""
             labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`, defaults to :obj:`None`):
@@ -251,16 +253,16 @@ class RobertaWithTabular(RobertaPreTrainedModel):
         # print("cat_feats", cat_feats.shape)
         # print("numerical_feats", numerical_feats.shape)
         # print("self.cat_offsets", self.cat_offsets)
+        # print("cat_mask", cat_mask.shape)
+        # print("numerical_mask", numerical_mask.shape)
 
         cum_cat_offsets = np.cumsum([0] + self.cat_offsets)
         mask_index = repeat(torch.tensor(cum_cat_offsets[:-1], device=cat_feats.device), 'd -> b d', b = cat_feats.size(0))
-        cat_mask = torch.rand(cat_feats.shape, device=cat_feats.device) < self.mask_ratio
         # print(torch.sum(cat_mask))
         cat_mask[cat_feats == mask_index] = 0
         # print(torch.sum(cat_mask))
         cat_input = cat_feats.clone()
         cat_input[cat_mask] = mask_index[cat_mask]
-        numerical_mask = torch.rand(numerical_feats.shape, device=numerical_feats.device) < self.mask_ratio
         numerical_input = numerical_feats.clone()
         numerical_input[numerical_mask] = 0
         outputs = self.model(

@@ -27,6 +27,7 @@ from multimodal_transformers.multimodal_arguments import (
 )
 from util import create_dir_if_not_exists, get_args_info_as_str
 from sklearn.preprocessing import StandardScaler
+from torch import nn
 
 os.environ["COMET_MODE"] = "DISABLED"
 logger = logging.getLogger(__name__)
@@ -263,6 +264,12 @@ def main():
         if i == 0:
             logger.info(tabular_config)
             logger.info(model)
+            for name, module in model.named_modules():
+                if isinstance(module, nn.Module):
+                    num_params = sum(p.numel() for p in module.parameters() if p.requires_grad)
+                    print(f"Module: {name}, Parameters: {num_params}")
+            num_params = sum(p.numel() for p in model.parameters())
+            print("sum_params", num_params)
 
         trainer = Trainer(
             model=model,

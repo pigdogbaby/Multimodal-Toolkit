@@ -161,7 +161,8 @@ def hf_loss_func_impute(inputs, classifier, cat_feats, numerical_feats, cat_offs
         cat_logits.append(cat_logit)
         cat_labels.append(cat_label)
         # print("ce", i, cat_logit.shape, torch.unique(cat_label))
-        loss += ce(cat_logit, cat_label)
+        # loss += ce(cat_logit, cat_label)
+        loss += 0.2 * ce(cat_logit, cat_label)
 
     numerical_logits = []
     numerical_labels = []

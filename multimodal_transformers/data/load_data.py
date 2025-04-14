@@ -697,6 +697,11 @@ def load_data(
     else:
         labels = None
 
+    cat_mask = np.random.rand(*categorical_feats.shape) < 0.1
+    # print("check cat_mask", np.sum(cat_mask), cat_mask.shape)
+    numerical_mask = np.random.rand(*numerical_feats.shape) < 0.1
+    # print("check num_mask", np.sum(num_mask), num_mask.shape)
+
     return TorchTabularTextDataset(
         encodings=None,
         categorical_feats=categorical_feats,
@@ -705,4 +710,6 @@ def load_data(
         labels=labels,
         df=data_df,
         label_list=label_list,
+        cat_mask=cat_mask,
+        numerical_mask=numerical_mask,
     )
