@@ -27,7 +27,7 @@ from .tabular_combiner import TabularFeatCombiner
 from .tabular_config import TabularConfig
 from .layer_utils import MLP, calc_mlp_dims, hf_loss_func
 
-from .modeling_roberta import RobertaModel
+from .modeling_roberta import MyRobertaModel
 from.modeling_pt import PtModel, PtPreTrainedModel
 
 class BertWithTabular(BertForSequenceClassification):
@@ -153,7 +153,7 @@ class RobertaWithTabular(RobertaPreTrainedModel):
 
     def __init__(self, hf_model_config):
         super().__init__(hf_model_config)
-        self.model = RobertaModel(hf_model_config, add_pooling_layer=False)
+        self.model = MyRobertaModel(hf_model_config, add_pooling_layer=False)
         tabular_config = hf_model_config.tabular_config
         if type(tabular_config) is dict:  # when loading from saved model
             tabular_config = TabularConfig(**tabular_config)

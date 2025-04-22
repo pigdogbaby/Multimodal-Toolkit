@@ -110,25 +110,25 @@ class PtHeadSelection(nn.Module):
         self.rope_theta = config.rope_theta
         self.is_causal = False
 
-        self.hard = config.hard
-        self.cpd = config.cpd
-        if self.hard:
-            if config.cpd:
-                self.ternary_factor_u1 = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.num_channels * self.ternary_rank))
-                self.ternary_factor_u2 = nn.Parameter(torch.empty(self.dim_z, self.num_channels * self.ternary_rank))
-                self.ternary_factor_v1 = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.num_channels * self.ternary_rank))
-                self.ternary_factor_v2 = nn.Parameter(torch.empty(self.dim_z, self.num_channels * self.ternary_rank))
-            else:
-                self.ternary_factor_u = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.dim_z, self.num_channels * self.ternary_rank))
-                self.ternary_factor_v = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.dim_z, self.num_channels * self.ternary_rank))
-        else:
+        self.mode = config.mode
+        self.attention_act_fn = config.attention_act_fn
+        if self.mode == 1:
             self.ternary_factor_u = nn.Parameter(torch.empty(self.num_channels * self.ternary_rank, self.dim_z))
             self.ternary_factor_v = nn.Parameter(torch.empty(self.num_channels * self.ternary_rank, self.dim_z))
+        elif self.mode == 2:
+            self.ternary_factor_u = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.dim_z, self.num_channels * self.ternary_rank))
+            self.ternary_factor_v = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.dim_z, self.num_channels * self.ternary_rank))
+        elif self.mode == 3:
+            self.ternary_factor_u1 = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.num_channels * self.ternary_rank))
+            self.ternary_factor_u2 = nn.Parameter(torch.empty(self.dim_z, self.num_channels * self.ternary_rank))
+            self.ternary_factor_v1 = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.num_channels * self.ternary_rank))
+            self.ternary_factor_v2 = nn.Parameter(torch.empty(self.dim_z, self.num_channels * self.ternary_rank))
+
         self.dropout = nn.Dropout(config.dropout_prob_h)
         self._init_ternary()
     
     def _init_ternary(self):
-        if self.cpd:
+        if self.mode == 3:
             nn.init.normal_(self.ternary_factor_u1, mean=0.0, std=self.config.ternary_initializer_range)
             nn.init.normal_(self.ternary_factor_u2, mean=0.0, std=self.config.ternary_initializer_range)
             nn.init.normal_(self.ternary_factor_v1, mean=0.0, std=self.config.ternary_initializer_range)
@@ -148,16 +148,15 @@ class PtHeadSelection(nn.Module):
 
         bsz, seq_len, _ = qz.size()
 
-        if self.hard:
-            if self.cpd:
-                qz_u = oe.contract("bnd,nr,dr->bnr", *[qz, self.ternary_factor_u1, self.ternary_factor_u2], optimize='optimal', backend='torch')
-                qz_v = oe.contract("bnd,nr,dr->bnr", *[qz, self.ternary_factor_v1, self.ternary_factor_v2], optimize='optimal', backend='torch')
-            else:
-                qz_u = torch.einsum("bnd,ndr->bnr", qz, self.ternary_factor_u)
-                qz_v = torch.einsum("bnd,ndr->bnr", qz, self.ternary_factor_v)
-        else:
+        if self.mode == 1:
             qz_u = nn.functional.linear(qz, self.ternary_factor_u) * self.config.ternary_factor_scaling
             qz_v = nn.functional.linear(qz, self.ternary_factor_v) * self.config.ternary_factor_scaling
+        elif self.mode == 2:
+            qz_u = torch.einsum("bnd,ndr->bnr", qz, self.ternary_factor_u)
+            qz_v = torch.einsum("bnd,ndr->bnr", qz, self.ternary_factor_v)
+        elif self.mode == 3:
+            qz_u = oe.contract("bnd,nr,dr->bnr", *[qz, self.ternary_factor_u1, self.ternary_factor_u2], optimize='optimal', backend='torch')
+            qz_v = oe.contract("bnd,nr,dr->bnr", *[qz, self.ternary_factor_v1, self.ternary_factor_v2], optimize='optimal', backend='torch')
 
         qz_u = qz_u.view(bsz, seq_len, self.num_channels, self.ternary_rank).transpose(1, 2)
         qz_v = qz_v.view(bsz, seq_len, self.num_channels, self.ternary_rank).transpose(1, 2)
@@ -188,8 +187,11 @@ class PtHeadSelection(nn.Module):
             message_F = message_F + dependency_mask # need mask diag
 
         # upcast attention to fp32
-        # - torch.log(torch.tensor(seq_len, dtype=torch.float32))
-        qh = nn.functional.sigmoid(message_F / self.config.regularize_h).to(qz_u.dtype)
+        if self.attention_act_fn == 1:
+            qh = nn.functional.softmax(message_F / self.config.regularize_h, dim=-1, dtype=torch.float32).to(qz_u.dtype)
+        else:
+            # - torch.log(torch.tensor(seq_len, dtype=torch.float32))
+            qh = nn.functional.sigmoid(message_F / self.config.regularize_h).to(qz_u.dtype)
 
         # print("qh", qh[0])
 
@@ -217,15 +219,14 @@ class PtHeadSelection(nn.Module):
         qh_v1 = qh_v1.reshape(bsz, seq_len, self.num_channels * self.ternary_rank)
         qh_v2 = qh_v2.reshape(bsz, seq_len, self.num_channels * self.ternary_rank)
 
-        if self.hard:
-            if self.cpd:
-                message_G = oe.contract(
-                    "bnr,nr,dr->bnd", *[qh_v1, self.ternary_factor_u1, self.ternary_factor_u2], optimize='optimal', backend='torch') + oe.contract(
-                    "bnr,nr,dr->bnd", *[qh_v2, self.ternary_factor_v1, self.ternary_factor_v2], optimize='optimal', backend='torch')
-            else:
-                message_G = torch.einsum("bnr,ndr->bnd", qh_v1, self.ternary_factor_u) + torch.einsum("bnr,ndr->bnd", qh_v2, self.ternary_factor_v)
-        else:
+        if self.mode == 1:
             message_G = (torch.matmul(qh_v1, self.ternary_factor_u) + torch.matmul(qh_v2, self.ternary_factor_v)) * self.config.ternary_factor_scaling
+        elif self.mode == 2:
+            message_G = torch.einsum("bnr,ndr->bnd", qh_v1, self.ternary_factor_u) + torch.einsum("bnr,ndr->bnd", qh_v2, self.ternary_factor_v)
+        elif self.mode == 3:
+            message_G = oe.contract(
+                "bnr,nr,dr->bnd", *[qh_v1, self.ternary_factor_u1, self.ternary_factor_u2], optimize='optimal', backend='torch') + oe.contract(
+                "bnr,nr,dr->bnd", *[qh_v2, self.ternary_factor_v1, self.ternary_factor_v2], optimize='optimal', backend='torch')
 
         # print("message_G", message_G[0])
         # print(self.stop)

@@ -161,8 +161,8 @@ class PtConfig(PretrainedConfig):
         regularize_z=1.0,
         regularize_h=1.0,
         regularize_g=1.0,
-        hard=False,
-        cpd=False,
+        mode=1,
+        attention_act_fn=1,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -202,8 +202,8 @@ class PtConfig(PretrainedConfig):
         self.hidden_act = kwargs.pop("hidden_act", "gelu")
         self.layer_norm_eps = kwargs.pop("layer_norm_eps", 1e-6)
 
-        self.hard = hard
-        self.cpd = cpd
+        self.mode = mode
+        self.attention_act_fn = attention_act_fn
 
         super().__init__(
             pad_token_id=pad_token_id,

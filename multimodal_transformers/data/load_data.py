@@ -660,6 +660,7 @@ def load_data(
     cat_offsets = [0] + cat_offsets
     cat_offsets = np.cumsum(cat_offsets)
     categorical_feats = categorical_feats.astype(int) + cat_offsets[:-1]
+    categorical_feats = categorical_feats.to_numpy().astype(int)
 
     # print("categorical_feats\n", categorical_feats)
     # Build numerical features

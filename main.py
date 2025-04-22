@@ -27,6 +27,7 @@ from multimodal_transformers.multimodal_arguments import (
 )
 from util import create_dir_if_not_exists, get_args_info_as_str
 from sklearn.preprocessing import StandardScaler
+from torch import nn
 
 os.environ["COMET_MODE"] = "DISABLED"
 logger = logging.getLogger(__name__)
@@ -43,7 +44,10 @@ def main():
             json_file=os.path.abspath(sys.argv[1])
         )
     else:
-        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        model_args, data_args, training_args, remaining_strings = parser.parse_args_into_dataclasses(return_remaining_strings=True)
+        print("remaining_strings", remaining_strings)
+        remaining_args = {x.split('=')[0][2:]: int(x.split('=')[1]) for x in remaining_strings}
+        print("remaining_args", remaining_args)
 
     if (
         os.path.exists(training_args.output_dir)
@@ -132,6 +136,8 @@ def main():
         )
         print("check cat_offsets", cat_offsets)
 
+    ### used for tabred
+
     # X_num = np.load(data_args.data_path + "/X_num.npy")
     # num_means = np.nanmean(X_num, axis=0)
     # nan_indices = np.isnan(X_num)
@@ -144,9 +150,8 @@ def main():
     # # X_bin = np.load(data_args.data_path + "/X_cat.npy").astype(int)
     # num_bin = X_bin.shape[1]
     # cat_offsets = [X_bin[:,i].max() + 1 for i in range(num_bin)]
-    # cat_offsets = [0] + cat_offsets
-    # cat_offsets = np.cumsum(cat_offsets)
-    # X_bin = X_bin + cat_offsets[:-1]
+    # cat_cumsum = np.cumsum([0] + cat_offsets)
+    # X_bin = X_bin + cat_cumsum[:-1]
 
     # Y = np.load(data_args.data_path + "/Y.npy")
     # train_idx = np.load(data_args.data_path + "/split-default/train_idx.npy")
@@ -177,6 +182,8 @@ def main():
     #     df=None,
     #     label_list=None,
     # ),)
+
+    ###
 
     train_dataset = train_datasets[0]
 
@@ -246,6 +253,11 @@ def main():
             num_feats=train_dataset.cat_feats.shape[1]+train_dataset.numerical_feats.shape[1],
             **vars(data_args),
         )
+
+        for key, value in remaining_args.items():
+            setattr(config, key, value)
+        print(config)
+
         config.tabular_config = tabular_config
 
         model = AutoModelWithTabular.from_config(
@@ -254,6 +266,12 @@ def main():
         if i == 0:
             logger.info(tabular_config)
             logger.info(model)
+            for name, module in model.named_modules():
+                if isinstance(module, nn.Module):
+                    num_params = sum(p.numel() for p in module.parameters() if p.requires_grad)
+                    print(f"Module: {name}, Parameters: {num_params}")
+            num_params = sum(p.numel() for p in model.parameters())
+            print("sum_params", num_params)
 
         trainer = Trainer(
             model=model,
@@ -291,40 +309,40 @@ def main():
 
             eval_results.update(eval_result)
 
-        # if training_args.do_predict:
-        #     logging.info("*** Test ***")
+        if training_args.do_predict:
+            logging.info("*** Test ***")
 
-        #     predictions = trainer.predict(test_dataset=test_dataset).predictions[0]
-        #     output_test_file = os.path.join(
-        #         training_args.output_dir, f"test_results_{task}_fold_{i+1}.txt"
-        #     )
-        #     eval_result = trainer.evaluate(eval_dataset=test_dataset)
-        #     logger.info(pformat(eval_result, indent=4))
-        #     if trainer.is_world_process_zero():
-        #         with open(output_test_file, "w") as writer:
-        #             logger.info("***** Test results {} *****".format(task))
-        #             writer.write("index\tprediction\n")
-        #             if task == "classification":
-        #                 predictions = np.argmax(predictions, axis=1)
-        #             for index, item in enumerate(predictions):
-        #                 if task == "regression":
-        #                     writer.write(
-        #                         "%d\t%3.3f\t%d\n"
-        #                         % (index, item, test_dataset.labels[index])
-        #                     )
-        #                 else:
-        #                     item = test_dataset.get_labels()[item]
-        #                     writer.write("%d\t%s\n" % (index, item))
-        #         output_test_file = os.path.join(
-        #             training_args.output_dir,
-        #             f"test_metric_results_{task}_fold_{i+1}.txt",
-        #         )
-        #         with open(output_test_file, "w") as writer:
-        #             logger.info("***** Test results {} *****".format(task))
-        #             for key, value in eval_result.items():
-        #                 logger.info("  %s = %s", key, value)
-        #                 writer.write("%s = %s\n" % (key, value))
-        #         eval_results.update(eval_result)
+            predictions = trainer.predict(test_dataset=test_dataset).predictions[0]
+            output_test_file = os.path.join(
+                training_args.output_dir, f"test_results_{task}_fold_{i+1}.txt"
+            )
+            eval_result = trainer.evaluate(eval_dataset=test_dataset)
+            logger.info(pformat(eval_result, indent=4))
+            if trainer.is_world_process_zero():
+                with open(output_test_file, "w") as writer:
+                    logger.info("***** Test results {} *****".format(task))
+                    writer.write("index\tprediction\n")
+                    if task == "classification":
+                        predictions = np.argmax(predictions, axis=1)
+                    for index, item in enumerate(predictions):
+                        if task == "regression":
+                            writer.write(
+                                "%d\t%3.3f\t%d\n"
+                                % (index, item, test_dataset.labels[index])
+                            )
+                        else:
+                            item = test_dataset.get_labels()[item]
+                            writer.write("%d\t%s\n" % (index, item))
+                output_test_file = os.path.join(
+                    training_args.output_dir,
+                    f"test_metric_results_{task}_fold_{i+1}.txt",
+                )
+                with open(output_test_file, "w") as writer:
+                    logger.info("***** Test results {} *****".format(task))
+                    for key, value in eval_result.items():
+                        logger.info("  %s = %s", key, value)
+                        writer.write("%s = %s\n" % (key, value))
+                eval_results.update(eval_result)
         del model
         del config
         del tabular_config

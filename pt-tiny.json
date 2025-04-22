@@ -6,7 +6,7 @@
   "eos_token_id": 2,
   "model_type": "pt",
   "dim_z": 512,
-  "dim_g": 1024,
+  "dim_g": 2048,
   "num_iterations": 8,
   "num_channels": 8,
   "ternary_rank": 64,
@@ -29,6 +29,6 @@
   "output_heads": false,
   "output_qzs": false,
   "vocab_size": 32000,
-  "hard": true,
-  "cpd": true
+  "mode": 1,
+  "attention_act_fn": 2
 }
