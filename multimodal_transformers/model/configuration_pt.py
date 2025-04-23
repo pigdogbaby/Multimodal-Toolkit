@@ -161,7 +161,7 @@ class PtConfig(PretrainedConfig):
         regularize_z=1.0,
         regularize_h=1.0,
         regularize_g=1.0,
-        mode=1,
+        attention_mode=1,
         attention_act_fn=1,
         **kwargs,
     ):
@@ -194,7 +194,7 @@ class PtConfig(PretrainedConfig):
         self.dropout_prob_h = dropout_prob_h
         self.classifier_dropout = classifier_dropout
         self.regularize_z = regularize_z
-        self.regularize_h = regularize_h
+        self.regularize_h = 1 / dim_z
         self.regularize_g = regularize_g
 
         # prediction head config
@@ -202,7 +202,7 @@ class PtConfig(PretrainedConfig):
         self.hidden_act = kwargs.pop("hidden_act", "gelu")
         self.layer_norm_eps = kwargs.pop("layer_norm_eps", 1e-6)
 
-        self.mode = mode
+        self.attention_mode = attention_mode
         self.attention_act_fn = attention_act_fn
 
         super().__init__(

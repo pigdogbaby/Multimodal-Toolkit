@@ -19,7 +19,7 @@
   "type_vocab_size": 1,
   "vocab_size": 50265,
   "attention_head_size": 64,
-  "mode": 1,
+  "attention_mode": 1,
   "attention_act_fn": 1,
   "rank": 0
 }

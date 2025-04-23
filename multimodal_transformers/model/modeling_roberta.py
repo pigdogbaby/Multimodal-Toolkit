@@ -160,25 +160,25 @@ class RobertaSelfAttention(nn.Module):
                 f"heads ({config.num_attention_heads})"
             )
 
-        self.mode = config.mode
+        self.attention_mode = config.attention_mode
         self.attention_act_fn = config.attention_act_fn
         self.rank = config.rank
         self.num_attention_heads = config.num_attention_heads
         self.attention_head_size = config.attention_head_size
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        if self.mode == 1:
+        if self.attention_mode == 1:
             self.query = nn.Linear(config.hidden_size, self.all_head_size)
             self.key = nn.Linear(config.hidden_size, self.all_head_size)
             self.value = nn.Linear(config.hidden_size, self.all_head_size)
-        elif self.mode == 2:
+        elif self.attention_mode == 2:
             self.query = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, config.hidden_size, self.all_head_size))
             self.key = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, config.hidden_size, self.all_head_size))
             self.value = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, config.hidden_size, self.all_head_size))
             nn.init.normal_(self.query, mean=0.0, std=config.initializer_range)
             nn.init.normal_(self.key, mean=0.0, std=config.initializer_range)
             nn.init.normal_(self.value, mean=0.0, std=config.initializer_range)
-        elif self.mode == 3:
+        elif self.attention_mode == 3:
             self.query = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
             self.key = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
             self.value = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
@@ -191,7 +191,7 @@ class RobertaSelfAttention(nn.Module):
             nn.init.normal_(self.query1, mean=0.0, std=config.initializer_range)
             nn.init.normal_(self.key1, mean=0.0, std=config.initializer_range)
             nn.init.normal_(self.value1, mean=0.0, std=config.initializer_range)
-        elif self.mode == 4:
+        elif self.attention_mode == 4:
             self.query = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size, self.rank))
             self.key = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size, self.rank))
             self.value = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size, self.rank))
@@ -204,7 +204,7 @@ class RobertaSelfAttention(nn.Module):
             nn.init.normal_(self.query1, mean=0.0, std=config.initializer_range)
             nn.init.normal_(self.key1, mean=0.0, std=config.initializer_range)
             nn.init.normal_(self.value1, mean=0.0, std=config.initializer_range)
-        elif self.mode == 5:
+        elif self.attention_mode == 5:
             self.query = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size, self.rank))
             self.key = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size, self.rank))
             self.value = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size, self.rank))
@@ -243,14 +243,14 @@ class RobertaSelfAttention(nn.Module):
         past_key_value: Optional[Tuple[Tuple[torch.FloatTensor]]] = None,
         output_attentions: Optional[bool] = False,
     ) -> Tuple[torch.Tensor]:
-        if self.mode == 1:
+        if self.attention_mode == 1:
             mixed_query_layer = self.query(hidden_states)
-        elif self.mode == 2:
+        elif self.attention_mode == 2:
             mixed_query_layer = torch.einsum("bnd,ndr->bnr", hidden_states, self.query)
-        elif self.mode == 3:
+        elif self.attention_mode == 3:
             mixed_query_layer = oe.contract(
                 "bnd,nr,dr->bnr", *[hidden_states, self.query1, self.query], optimize='optimal', backend='torch')
-        elif self.mode == 4:
+        elif self.attention_mode == 4:
             q = torch.einsum("bnd,drk->bnrk", hidden_states, self.query)
             q1 = torch.einsum("bnd,ndk->bnk", hidden_states, self.query1)
             mixed_query_layer = torch.einsum("bnrk,bnk->bnr", q, q1)
@@ -278,18 +278,18 @@ class RobertaSelfAttention(nn.Module):
             key_layer = torch.cat([past_key_value[0], key_layer], dim=2)
             value_layer = torch.cat([past_key_value[1], value_layer], dim=2)
         else:
-            if self.mode == 1:
+            if self.attention_mode == 1:
                 key_layer = self.transpose_for_scores(self.key(hidden_states))
                 value_layer = self.transpose_for_scores(self.value(hidden_states))
-            elif self.mode == 2:
+            elif self.attention_mode == 2:
                 key_layer = self.transpose_for_scores(torch.einsum("bnd,ndr->bnr", hidden_states, self.key))
                 value_layer = self.transpose_for_scores(torch.einsum("bnd,ndr->bnr", hidden_states, self.value))
-            elif self.mode == 3:
+            elif self.attention_mode == 3:
                 key_layer = self.transpose_for_scores(oe.contract(
                     "bnd,nr,dr->bnr", *[hidden_states, self.key1, self.key], optimize='optimal', backend='torch'))
                 value_layer = self.transpose_for_scores(oe.contract(
                     "bnd,nr,dr->bnr", *[hidden_states, self.value1, self.value], optimize='optimal', backend='torch'))
-            elif self.mode == 4:
+            elif self.attention_mode == 4:
                 k = torch.einsum("bnd,drk->bnrk", hidden_states, self.key)
                 k1 = torch.einsum("bnd,ndk->bnk", hidden_states, self.key1)
                 key_layer = self.transpose_for_scores(torch.einsum("bnrk,bnk->bnr", k, k1))

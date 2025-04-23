@@ -98,7 +98,7 @@ class MyRobertaConfig(PretrainedConfig):
 
     def __init__(
         self,
-        mode=1,
+        attention_mode=1,
         attention_act_fn=1,
         rank=1,
         vocab_size=50265,
@@ -124,7 +124,7 @@ class MyRobertaConfig(PretrainedConfig):
     ):
         super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
 
-        self.mode = mode
+        self.attention_mode = attention_mode
         self.attention_act_fn = attention_act_fn
         self.rank = rank
         self.vocab_size = vocab_size

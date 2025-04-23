@@ -110,15 +110,15 @@ class PtHeadSelection(nn.Module):
         self.rope_theta = config.rope_theta
         self.is_causal = False
 
-        self.mode = config.mode
+        self.attention_mode = config.attention_mode
         self.attention_act_fn = config.attention_act_fn
-        if self.mode == 1:
+        if self.attention_mode == 1:
             self.ternary_factor_u = nn.Parameter(torch.empty(self.num_channels * self.ternary_rank, self.dim_z))
             self.ternary_factor_v = nn.Parameter(torch.empty(self.num_channels * self.ternary_rank, self.dim_z))
-        elif self.mode == 2:
+        elif self.attention_mode == 2:
             self.ternary_factor_u = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.dim_z, self.num_channels * self.ternary_rank))
             self.ternary_factor_v = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.dim_z, self.num_channels * self.ternary_rank))
-        elif self.mode == 3:
+        elif self.attention_mode == 3:
             self.ternary_factor_u1 = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.num_channels * self.ternary_rank))
             self.ternary_factor_u2 = nn.Parameter(torch.empty(self.dim_z, self.num_channels * self.ternary_rank))
             self.ternary_factor_v1 = nn.Parameter(torch.empty(config.tabular_config.num_feats + 1, self.num_channels * self.ternary_rank))
@@ -128,7 +128,7 @@ class PtHeadSelection(nn.Module):
         self._init_ternary()
     
     def _init_ternary(self):
-        if self.mode == 3:
+        if self.attention_mode == 3:
             nn.init.normal_(self.ternary_factor_u1, mean=0.0, std=self.config.ternary_initializer_range)
             nn.init.normal_(self.ternary_factor_u2, mean=0.0, std=self.config.ternary_initializer_range)
             nn.init.normal_(self.ternary_factor_v1, mean=0.0, std=self.config.ternary_initializer_range)
@@ -148,13 +148,13 @@ class PtHeadSelection(nn.Module):
 
         bsz, seq_len, _ = qz.size()
 
-        if self.mode == 1:
+        if self.attention_mode == 1:
             qz_u = nn.functional.linear(qz, self.ternary_factor_u) * self.config.ternary_factor_scaling
             qz_v = nn.functional.linear(qz, self.ternary_factor_v) * self.config.ternary_factor_scaling
-        elif self.mode == 2:
+        elif self.attention_mode == 2:
             qz_u = torch.einsum("bnd,ndr->bnr", qz, self.ternary_factor_u)
             qz_v = torch.einsum("bnd,ndr->bnr", qz, self.ternary_factor_v)
-        elif self.mode == 3:
+        elif self.attention_mode == 3:
             qz_u = oe.contract("bnd,nr,dr->bnr", *[qz, self.ternary_factor_u1, self.ternary_factor_u2], optimize='optimal', backend='torch')
             qz_v = oe.contract("bnd,nr,dr->bnr", *[qz, self.ternary_factor_v1, self.ternary_factor_v2], optimize='optimal', backend='torch')
 
@@ -219,11 +219,11 @@ class PtHeadSelection(nn.Module):
         qh_v1 = qh_v1.reshape(bsz, seq_len, self.num_channels * self.ternary_rank)
         qh_v2 = qh_v2.reshape(bsz, seq_len, self.num_channels * self.ternary_rank)
 
-        if self.mode == 1:
+        if self.attention_mode == 1:
             message_G = (torch.matmul(qh_v1, self.ternary_factor_u) + torch.matmul(qh_v2, self.ternary_factor_v)) * self.config.ternary_factor_scaling
-        elif self.mode == 2:
+        elif self.attention_mode == 2:
             message_G = torch.einsum("bnr,ndr->bnd", qh_v1, self.ternary_factor_u) + torch.einsum("bnr,ndr->bnd", qh_v2, self.ternary_factor_v)
-        elif self.mode == 3:
+        elif self.attention_mode == 3:
             message_G = oe.contract(
                 "bnr,nr,dr->bnd", *[qh_v1, self.ternary_factor_u1, self.ternary_factor_u2], optimize='optimal', backend='torch') + oe.contract(
                 "bnr,nr,dr->bnd", *[qh_v2, self.ternary_factor_v1, self.ternary_factor_v2], optimize='optimal', backend='torch')
