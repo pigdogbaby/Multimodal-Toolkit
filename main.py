@@ -33,6 +33,11 @@ from transformers.trainer_callback import EarlyStoppingCallback
 os.environ["COMET_MODE"] = "DISABLED"
 logger = logging.getLogger(__name__)
 
+def convert_string(s):
+    try:
+        return int(s)
+    except ValueError:
+        return float(s)
 
 def main():
     parser = HfArgumentParser(
@@ -47,7 +52,7 @@ def main():
     else:
         model_args, data_args, training_args, remaining_strings = parser.parse_args_into_dataclasses(return_remaining_strings=True)
         print("remaining_strings", remaining_strings)
-        remaining_args = {x.split('=')[0][2:]: int(x.split('=')[1]) for x in remaining_strings}
+        remaining_args = {x.split('=')[0][2:]: convert_string(x.split('=')[1]) for x in remaining_strings}
         print("remaining_args", remaining_args)
 
     ###

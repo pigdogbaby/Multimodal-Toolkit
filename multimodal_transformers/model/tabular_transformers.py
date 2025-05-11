@@ -284,7 +284,7 @@ class PtWithTabular(PtPreTrainedModel):
         self.dropout = nn.Dropout(hf_model_config.dropout_prob_z)
         if tabular_config.use_simple_classifier:
             self.tabular_classifier = nn.Linear(
-                hf_model_config.hidden_size, tabular_config.num_labels
+                hf_model_config.dim_z, tabular_config.num_labels
             )
         else:
             dims = calc_mlp_dims(

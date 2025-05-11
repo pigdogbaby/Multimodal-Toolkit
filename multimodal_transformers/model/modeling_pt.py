@@ -109,6 +109,7 @@ class PtHeadSelection(nn.Module):
         self.max_position_embeddings = config.max_position_embeddings
         self.rope_theta = config.rope_theta
         self.is_causal = False
+        self.regularize_h = 1 / self.dim_z
 
         self.attention_mode = config.attention_mode
         self.attention_act_fn = config.attention_act_fn
@@ -188,10 +189,10 @@ class PtHeadSelection(nn.Module):
 
         # upcast attention to fp32
         if self.attention_act_fn == 1:
-            qh = nn.functional.softmax(message_F / self.config.regularize_h, dim=-1, dtype=torch.float32).to(qz_u.dtype)
+            qh = nn.functional.softmax(message_F / self.regularize_h, dim=-1).to(qz_u.dtype)
         else:
             # - torch.log(torch.tensor(seq_len, dtype=torch.float32))
-            qh = nn.functional.sigmoid(message_F / self.config.regularize_h).to(qz_u.dtype)
+            qh = nn.functional.sigmoid(message_F / self.regularize_h).to(qz_u.dtype)
 
         # print("qh", qh[0])
 
@@ -353,10 +354,10 @@ class PtModel(PtPreTrainedModel):
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
 
-        self.cat_embeddings = nn.Embedding(sum(config.tabular_config.cat_offsets), config.hidden_size)
-        self.num_embeddings = nn.Parameter(torch.empty(config.tabular_config.numerical_feat_dim, config.hidden_size))
-        self.num_bias = nn.Parameter(torch.empty(config.tabular_config.numerical_feat_dim, config.hidden_size))
-        self.cls_token = nn.Parameter(torch.empty(1, 1, config.hidden_size))
+        self.cat_embeddings = nn.Embedding(sum(config.tabular_config.cat_offsets), config.dim_z)
+        self.num_embeddings = nn.Parameter(torch.empty(config.tabular_config.numerical_feat_dim, config.dim_z))
+        self.num_bias = nn.Parameter(torch.empty(config.tabular_config.numerical_feat_dim, config.dim_z))
+        self.cls_token = nn.Parameter(torch.empty(1, 1, config.dim_z))
         nn.init.normal_(self.num_embeddings, mean=0.0, std=config.ternary_initializer_range)
         nn.init.normal_(self.num_bias, mean=0.0, std=config.ternary_initializer_range)
         nn.init.normal_(self.cls_token, mean=0.0, std=config.ternary_initializer_range)
