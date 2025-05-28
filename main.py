@@ -57,16 +57,16 @@ def main():
 
     ###
     ### used for sweep
-        import random
-        import string
+        # import random
+        # import string
 
-        def generate_random_string(length):
-            characters = string.ascii_letters + string.digits
-            random_string = ''.join(random.choices(characters, k=length))
-            return random_string
-        result = generate_random_string(8)
-        training_args.output_dir += result
-        print(training_args.output_dir)
+        # def generate_random_string(length):
+        #     characters = string.ascii_letters + string.digits
+        #     random_string = ''.join(random.choices(characters, k=length))
+        #     return random_string
+        # result = generate_random_string(8)
+        # training_args.output_dir += result
+        # print(training_args.output_dir)
     ###
 
     if (
@@ -284,8 +284,8 @@ def main():
 
         config.tabular_config = tabular_config
 
-        model = AutoModelWithTabular.from_config(
-            config=config
+        model = AutoModelWithTabular.from_pretrained(
+            model_args.model_name_or_path
         )
         if i == 0:
             logger.info(tabular_config)
@@ -307,11 +307,11 @@ def main():
         )
         if training_args.do_train:
             trainer.train(
-                resume_from_checkpoint=(
-                    model_args.model_name_or_path
-                    if os.path.isdir(model_args.model_name_or_path)
-                    else None
-                )
+                # resume_from_checkpoint=(
+                #     model_args.model_name_or_path
+                #     if os.path.isdir(model_args.model_name_or_path)
+                #     else None
+                # )
             )
             trainer.save_model()
 

@@ -1,13 +1,13 @@
 export WANDB_PROJECT=sweeps_demo
-export WANDB_API_KEY=###
+export WANDB_API_KEY=cf12a933e3e4edbc59fd0674ca4173fec75e11a4
 
 python main.py \
-    --model_name_or_path None \
+    --model_name_or_path outputs/sweep/tmp \
     --config_name roberta-tune.json \
     --data_path /home/wuyou/tabred/data/sberbank-housing/ \
     --column_info_path datasets/income/column_info.json \
-    --output_dir outputs/sweep/ \
-    --run_name roberta-tune-5e_4-test \
+    --output_dir outputs/sweep/probing \
+    --run_name roberta-tune-5e_4-probing \
     --overwrite_output_dir \
     --report_to wandb \
     --task regression \
