@@ -2,7 +2,7 @@ import math
 import torch
 import torch.nn as nn
 from torch.nn import CrossEntropyLoss, MSELoss
-
+from einops import repeat
 
 class MLP(nn.Module):
     """mlp can specify number of hidden layers and hidden layer channels"""
@@ -126,6 +126,8 @@ def zeros(tensor):
 
 def hf_loss_func(inputs, classifier, labels, num_labels, class_weights):
     logits = classifier(inputs)
+    labels = torch.arange(0, num_labels, dtype=torch.long, device=inputs.device)
+    labels = repeat(labels, 'd -> b d', b = inputs.shape[0])
     if type(logits) is tuple:
         logits, layer_outputs = logits[0], logits[1]
     else:  # simple classifier
@@ -140,7 +142,8 @@ def hf_loss_func(inputs, classifier, labels, num_labels, class_weights):
         else:
             loss_fct = CrossEntropyLoss()
             labels = labels.long()
-            loss = loss_fct(logits.view(-1, num_labels), labels.view(-1))
+            # print(logits.shape, labels.shape)
+            loss = loss_fct(logits.view(-1, num_labels), labels.reshape(-1))
             # print("loss", loss)
     else:
         return None, logits, layer_outputs

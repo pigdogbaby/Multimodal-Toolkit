@@ -165,6 +165,7 @@ class RobertaWithTabular(RobertaPreTrainedModel):
         tabular_config.hidden_dropout_prob = hf_model_config.hidden_dropout_prob
         self.tabular_combiner = TabularFeatCombiner(tabular_config)
         self.num_labels = tabular_config.num_labels
+        self.num_feats = tabular_config.num_feats
         combined_feat_dim = self.tabular_combiner.final_out_dim
         self.dropout = nn.Dropout(hf_model_config.hidden_dropout_prob)
         if tabular_config.use_simple_classifier:
@@ -185,6 +186,10 @@ class RobertaWithTabular(RobertaPreTrainedModel):
                 hidden_channels=dims,
                 bn=True,
             )
+        self.probing = nn.Linear(
+            hf_model_config.hidden_size, self.num_feats
+        )
+        self.model.requires_grad_(False)
 
     @add_start_docstrings_to_model_forward(
         ROBERTA_INPUTS_DOCSTRING.format("(batch_size, sequence_length)")
@@ -240,13 +245,13 @@ class RobertaWithTabular(RobertaPreTrainedModel):
 
         sequence_output = outputs[0]
         # print("sequence_output.size()", sequence_output.size())
-        combined_feats = sequence_output[:, 0, :]
+        combined_feats = sequence_output[:, 1:, :]
         combined_feats = self.dropout(combined_feats)
         loss, logits, classifier_layer_outputs = hf_loss_func(
             combined_feats,
-            self.tabular_classifier,
-            labels,
-            self.num_labels,
+            self.probing,
+            None,
+            self.num_feats,
             self.class_weights,
         )
         # print("dbg forward")

@@ -36,16 +36,16 @@ def calc_classification_metrics(pred_scores, pred_labels, labels):
         }
     else:
         acc = (pred_labels == labels).mean()
-        f1_micro = f1_score(y_true=labels, y_pred=pred_labels, average="micro")
-        f1_macro = f1_score(y_true=labels, y_pred=pred_labels, average="macro")
-        f1_weighted = f1_score(y_true=labels, y_pred=pred_labels, average="weighted")
+        # f1_micro = f1_score(y_true=labels, y_pred=pred_labels, average="micro")
+        # f1_macro = f1_score(y_true=labels, y_pred=pred_labels, average="macro")
+        # f1_weighted = f1_score(y_true=labels, y_pred=pred_labels, average="weighted")
 
         result = {
             "acc": acc,
-            "f1_micro": f1_micro,
-            "f1_macro": f1_macro,
-            "f1_weighted": f1_weighted,
-            "mcc": matthews_corrcoef(labels, pred_labels),
+            # "f1_micro": f1_micro,
+            # "f1_macro": f1_macro,
+            # "f1_weighted": f1_weighted,
+            # "mcc": matthews_corrcoef(labels, pred_labels),
         }
 
     return result

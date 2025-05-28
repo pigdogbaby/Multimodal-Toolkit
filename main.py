@@ -221,6 +221,7 @@ def main():
             if data_args.num_classes == -1
             else data_args.num_classes
         )
+    num_feats = train_dataset.cat_feats.shape[1] + train_dataset.numerical_feats.shape[1]
 
     def build_compute_metrics_fn(task_name: str) -> Callable[[EvalPrediction], Dict]:
         def compute_metrics_fn(p: EvalPrediction):
@@ -238,8 +239,17 @@ def main():
                     pred_scores, preds_labels, p.label_ids
                 )
             elif task_name == "regression":
-                preds = np.squeeze(predictions)
-                return calc_regression_metrics(preds, p.label_ids)
+                # preds = np.squeeze(predictions)
+                # return calc_regression_metrics(preds, p.label_ids)
+                preds_labels = np.argmax(predictions, axis=1)
+                if predictions.shape[-1] == 2:
+                    pred_scores = softmax(predictions, axis=1)[:, 1]
+                else:
+                    pred_scores = softmax(predictions, axis=1)
+                labels = np.tile(np.arange(0, num_feats), (predictions.shape[0], 1))
+                return calc_classification_metrics(
+                    pred_scores, preds_labels, labels
+                )
             else:
                 return {}
 
@@ -274,7 +284,7 @@ def main():
                 else 0
             ),
             cat_offsets=cat_offsets,
-            num_feats=train_dataset.cat_feats.shape[1]+train_dataset.numerical_feats.shape[1],
+            num_feats=num_feats,
             **vars(data_args),
         )
 
@@ -303,7 +313,6 @@ def main():
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
             compute_metrics=build_compute_metrics_fn(task),
-            callbacks=[EarlyStoppingCallback(early_stopping_patience=16)],
         )
         if training_args.do_train:
             trainer.train(
