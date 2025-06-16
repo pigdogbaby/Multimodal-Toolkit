@@ -29,6 +29,6 @@
   "output_heads": false,
   "output_qzs": false,
   "vocab_size": 32000,
-  "hard": false,
-  "cpd": false
+  "attention_mode": 1,
+  "attention_act_fn": 2
 }
