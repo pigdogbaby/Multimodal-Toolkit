@@ -17,7 +17,7 @@ from transformers import (
     set_seed,
 )
 
-from evaluation import calc_classification_metrics, calc_regression_metrics
+from evaluation import calc_classification_metrics, calc_regression_metrics, calc_imputation_metrics
 from multimodal_transformers.data import load_data_from_folder, load_data_into_folds, TorchTabularTextDataset
 from multimodal_transformers.model import AutoModelWithTabular, TabularConfig
 from multimodal_transformers.multimodal_arguments import (
@@ -57,16 +57,16 @@ def main():
 
     ###
     ### used for sweep
-        import random
-        import string
+        # import random
+        # import string
 
-        def generate_random_string(length):
-            characters = string.ascii_letters + string.digits
-            random_string = ''.join(random.choices(characters, k=length))
-            return random_string
-        result = generate_random_string(8)
-        training_args.output_dir += result
-        print(training_args.output_dir)
+        # def generate_random_string(length):
+        #     characters = string.ascii_letters + string.digits
+        #     random_string = ''.join(random.choices(characters, k=length))
+        #     return random_string
+        # result = generate_random_string(8)
+        # training_args.output_dir += result
+        # print(training_args.output_dir)
     ###
 
     if (
@@ -100,112 +100,113 @@ def main():
 
     tokenizer = None
 
-    # if not data_args.create_folds:
-    #     train_dataset, val_dataset, test_dataset = load_data_from_folder(
-    #         data_args.data_path,
-    #         data_args.column_info["text_cols"],
-    #         tokenizer,
-    #         label_col=data_args.column_info["label_col"],
-    #         label_list=data_args.column_info["label_list"],
-    #         categorical_cols=data_args.column_info["cat_cols"],
-    #         numerical_cols=data_args.column_info["num_cols"],
-    #         categorical_encode_type=data_args.categorical_encode_type,
-    #         categorical_handle_na=data_args.categorical_handle_na,
-    #         categorical_na_value=data_args.categorical_na_value,
-    #         numerical_transformer_method=data_args.numerical_transformer_method,
-    #         numerical_handle_na=data_args.numerical_handle_na,
-    #         numerical_how_handle_na=data_args.numerical_how_handle_na,
-    #         numerical_na_value=data_args.numerical_na_value,
-    #         sep_text_token_str=(
-    #             tokenizer.sep_token
-    #             if not data_args.column_info["text_col_sep_token"]
-    #             else data_args.column_info["text_col_sep_token"]
-    #         ),
-    #         max_token_length=training_args.max_token_length,
-    #         debug=training_args.debug_dataset,
-    #         debug_dataset_size=training_args.debug_dataset_size,
-    #         output_dir=training_args.output_dir,
-    #     )
-    #     train_datasets = [train_dataset]
-    #     val_datasets = [val_dataset]
-    #     test_datasets = [test_dataset]
-    # else:
-    #     print("hello")
-    #     train_datasets, val_datasets, test_datasets, cat_offsets = load_data_into_folds(
-    #         data_args.data_path,
-    #         data_args.num_folds,
-    #         data_args.validation_ratio,
-    #         data_args.column_info["text_cols"],
-    #         tokenizer,
-    #         label_col=data_args.column_info["label_col"],
-    #         label_list=data_args.column_info["label_list"],
-    #         categorical_cols=data_args.column_info["cat_cols"],
-    #         numerical_cols=data_args.column_info["num_cols"],
-    #         categorical_encode_type=data_args.categorical_encode_type,
-    #         categorical_handle_na=data_args.categorical_handle_na,
-    #         categorical_na_value=data_args.categorical_na_value,
-    #         numerical_transformer_method=data_args.numerical_transformer_method,
-    #         numerical_handle_na=data_args.numerical_handle_na,
-    #         numerical_how_handle_na=data_args.numerical_how_handle_na,
-    #         numerical_na_value=data_args.numerical_na_value,
-    #         sep_text_token_str=None,
-    #         max_token_length=training_args.max_token_length,
-    #         debug=False,
-    #         debug_dataset_size=training_args.debug_dataset_size,
-    #         output_dir=training_args.output_dir,
-    #     )
-    #     print("check cat_offsets", cat_offsets)
+    if not data_args.create_folds:
+        train_dataset, val_dataset, test_dataset = load_data_from_folder(
+            data_args.data_path,
+            data_args.column_info["text_cols"],
+            tokenizer,
+            label_col=data_args.column_info["label_col"],
+            label_list=data_args.column_info["label_list"],
+            categorical_cols=data_args.column_info["cat_cols"],
+            numerical_cols=data_args.column_info["num_cols"],
+            categorical_encode_type=data_args.categorical_encode_type,
+            categorical_handle_na=data_args.categorical_handle_na,
+            categorical_na_value=data_args.categorical_na_value,
+            numerical_transformer_method=data_args.numerical_transformer_method,
+            numerical_handle_na=data_args.numerical_handle_na,
+            numerical_how_handle_na=data_args.numerical_how_handle_na,
+            numerical_na_value=data_args.numerical_na_value,
+            sep_text_token_str=(
+                tokenizer.sep_token
+                if not data_args.column_info["text_col_sep_token"]
+                else data_args.column_info["text_col_sep_token"]
+            ),
+            max_token_length=training_args.max_token_length,
+            debug=training_args.debug_dataset,
+            debug_dataset_size=training_args.debug_dataset_size,
+            output_dir=training_args.output_dir,
+        )
+        train_datasets = [train_dataset]
+        val_datasets = [val_dataset]
+        test_datasets = [test_dataset]
+    else:
+        print("hello")
+        train_datasets, val_datasets, test_datasets, cat_offsets = load_data_into_folds(
+            data_args.data_path,
+            data_args.num_folds,
+            data_args.validation_ratio,
+            data_args.column_info["text_cols"],
+            tokenizer,
+            label_col=data_args.column_info["label_col"],
+            label_list=data_args.column_info["label_list"],
+            categorical_cols=data_args.column_info["cat_cols"],
+            numerical_cols=data_args.column_info["num_cols"],
+            categorical_encode_type=data_args.categorical_encode_type,
+            categorical_handle_na=data_args.categorical_handle_na,
+            categorical_na_value=data_args.categorical_na_value,
+            numerical_transformer_method=data_args.numerical_transformer_method,
+            numerical_handle_na=data_args.numerical_handle_na,
+            numerical_how_handle_na=data_args.numerical_how_handle_na,
+            numerical_na_value=data_args.numerical_na_value,
+            sep_text_token_str=None,
+            max_token_length=training_args.max_token_length,
+            debug=False,
+            debug_dataset_size=training_args.debug_dataset_size,
+            output_dir=training_args.output_dir,
+            mask_ratio=data_args.mask_ratio,
+        )
+        print("check cat_offsets", cat_offsets)
 
     ###
     ### used for tabred
 
-    X_num = np.load(data_args.data_path + "X_num.npy")
-    num_means = np.nanmean(X_num, axis=0)
-    nan_indices = np.isnan(X_num)
-    X_num[nan_indices] = np.take(num_means, nan_indices.nonzero()[1])
-    scaler = StandardScaler()
-    X_num = scaler.fit_transform(X_num)
+    # X_num = np.load(data_args.data_path + "X_num.npy")
+    # num_means = np.nanmean(X_num, axis=0)
+    # nan_indices = np.isnan(X_num)
+    # X_num[nan_indices] = np.take(num_means, nan_indices.nonzero()[1])
+    # scaler = StandardScaler()
+    # X_num = scaler.fit_transform(X_num)
 
-    if os.path.exists(data_args.data_path + "X_bin.npy") and os.path.exists(data_args.data_path + "X_cat.npy"):
-        X_bin = np.concatenate((np.load(data_args.data_path + "X_bin.npy").astype(int), np.load(data_args.data_path + "X_cat.npy").astype(int)), axis=1)
-    elif os.path.exists(data_args.data_path + "X_bin.npy"):
-        X_bin = np.load(data_args.data_path + "X_bin.npy").astype(int)
-    else:
-        X_bin = np.load(data_args.data_path + "X_cat.npy").astype(int)
-    num_bin = X_bin.shape[1]
-    cat_offsets = [int(X_bin[:,i].max()) + 1 for i in range(num_bin)]
-    cat_cumsum = np.cumsum([0] + cat_offsets)
-    X_bin = X_bin + cat_cumsum[:-1]
+    # if os.path.exists(data_args.data_path + "X_bin.npy") and os.path.exists(data_args.data_path + "X_cat.npy"):
+    #     X_bin = np.concatenate((np.load(data_args.data_path + "X_bin.npy").astype(int), np.load(data_args.data_path + "X_cat.npy").astype(int)), axis=1)
+    # elif os.path.exists(data_args.data_path + "X_bin.npy"):
+    #     X_bin = np.load(data_args.data_path + "X_bin.npy").astype(int)
+    # else:
+    #     X_bin = np.load(data_args.data_path + "X_cat.npy").astype(int)
+    # num_bin = X_bin.shape[1]
+    # cat_offsets = [int(X_bin[:,i].max()) + 1 for i in range(num_bin)]
+    # cat_cumsum = np.cumsum([0] + cat_offsets)
+    # X_bin = X_bin + cat_cumsum[:-1]
 
-    Y = np.load(data_args.data_path + "Y.npy")
-    train_idx = np.load(data_args.data_path + "split-default/train_idx.npy")
-    val_idx = np.load(data_args.data_path + "split-default/val_idx.npy")
-    test_idx = np.load(data_args.data_path + "split-default/test_idx.npy")
+    # Y = np.load(data_args.data_path + "Y.npy")
+    # train_idx = np.load(data_args.data_path + "split-default/train_idx.npy")
+    # val_idx = np.load(data_args.data_path + "split-default/val_idx.npy")
+    # test_idx = np.load(data_args.data_path + "split-default/test_idx.npy")
 
-    train_datasets = (TorchTabularTextDataset(
-        encodings=None,
-        categorical_feats=X_bin[train_idx],
-        numerical_feats=X_num[train_idx],
-        labels=Y[train_idx],
-        df=None,
-        label_list=None,
-    ),)
-    val_datasets = (TorchTabularTextDataset(
-        encodings=None,
-        categorical_feats=X_bin[val_idx],
-        numerical_feats=X_num[val_idx],
-        labels=Y[val_idx],
-        df=None,
-        label_list=None,
-    ),)
-    test_datasets = (TorchTabularTextDataset(
-        encodings=None,
-        categorical_feats=X_bin[test_idx],
-        numerical_feats=X_num[test_idx],
-        labels=Y[test_idx],
-        df=None,
-        label_list=None,
-    ),)
+    # train_datasets = (TorchTabularTextDataset(
+    #     encodings=None,
+    #     categorical_feats=X_bin[train_idx],
+    #     numerical_feats=X_num[train_idx],
+    #     labels=Y[train_idx],
+    #     df=None,
+    #     label_list=None,
+    # ),)
+    # val_datasets = (TorchTabularTextDataset(
+    #     encodings=None,
+    #     categorical_feats=X_bin[val_idx],
+    #     numerical_feats=X_num[val_idx],
+    #     labels=Y[val_idx],
+    #     df=None,
+    #     label_list=None,
+    # ),)
+    # test_datasets = (TorchTabularTextDataset(
+    #     encodings=None,
+    #     categorical_feats=X_bin[test_idx],
+    #     numerical_feats=X_num[test_idx],
+    #     labels=Y[test_idx],
+    #     df=None,
+    #     label_list=None,
+    # ),)
 
     ###
 
@@ -213,20 +214,25 @@ def main():
 
     set_seed(training_args.seed)
     task = data_args.task
-    if task == "regression":
-        num_labels = 1
-    else:
+    if task == "classification":
         num_labels = (
             len(np.unique(train_dataset.labels))
             if data_args.num_classes == -1
             else data_args.num_classes
         )
+    else:
+        num_labels = 1
 
     def build_compute_metrics_fn(task_name: str) -> Callable[[EvalPrediction], Dict]:
         def compute_metrics_fn(p: EvalPrediction):
             # p.predictions is now a list of objects
             # The first entry is the actual predictions
             # print("dbg predictions", p.predictions[0].shape)
+            if task_name == "imputation":
+                cat_logits, cat_labels, numerical_logits, numerical_labels = p.predictions[1]
+                # print("metric", cat_labels[0])
+                return calc_imputation_metrics(cat_logits, cat_labels, numerical_logits, numerical_labels)
+            
             predictions = p.predictions[0]
             if task_name == "classification":
                 preds_labels = np.argmax(predictions, axis=1)
@@ -240,8 +246,7 @@ def main():
             elif task_name == "regression":
                 preds = np.squeeze(predictions)
                 return calc_regression_metrics(preds, p.label_ids)
-            else:
-                return {}
+
 
         return compute_metrics_fn
 
@@ -258,7 +263,10 @@ def main():
             ),
             cache_dir=model_args.cache_dir,
         )
-        print("cat_feats", train_dataset.cat_feats.shape)
+        num_feats = train_dataset.numerical_feats.shape[1]
+        if train_dataset.cat_feats is not None:
+            num_feats += train_dataset.cat_feats.shape[1]
+            print("cat_feats", train_dataset.cat_feats.shape)
         print("numerical_feats", train_dataset.numerical_feats.shape)
         print("labels", train_dataset.labels.shape)
         tabular_config = TabularConfig(
@@ -274,7 +282,9 @@ def main():
                 else 0
             ),
             cat_offsets=cat_offsets,
-            num_feats=train_dataset.cat_feats.shape[1]+train_dataset.numerical_feats.shape[1],
+            num_feats=num_feats,
+            imputation=(task=="imputation"),
+            alpha=training_args.alpha,
             **vars(data_args),
         )
 
@@ -335,46 +345,52 @@ def main():
             eval_results.update(eval_result)
 
         test_results = {}
-        if training_args.do_predict:
-            logging.info("*** Test ***")
+        ###
+        ### used for tabred
 
-            predictions = trainer.predict(test_dataset=test_dataset).predictions[0]
-            output_test_file = os.path.join(
-                training_args.output_dir, f"test_results_{task}_fold_{i+1}.txt"
-            )
-            test_result = trainer.evaluate(eval_dataset=test_dataset)
-            logger.info(pformat(test_result, indent=4))
-            if trainer.is_world_process_zero():
-                with open(output_test_file, "w") as writer:
-                    logger.info("***** Test results {} *****".format(task))
-                    writer.write("index\tprediction\n")
-                    if task == "classification":
-                        predictions = np.argmax(predictions, axis=1)
-                    for index, item in enumerate(predictions):
-                        if task == "regression":
-                            writer.write(
-                                "%d\t%3.3f\t%d\n"
-                                % (index, item, test_dataset.labels[index])
-                            )
-                        else:
-                            item = test_dataset.get_labels()[item]
-                            writer.write("%d\t%s\n" % (index, item))
-                output_test_file = os.path.join(
-                    training_args.output_dir,
-                    f"test_metric_results_{task}_fold_{i+1}.txt",
-                )
-                with open(output_test_file, "w") as writer:
-                    logger.info("***** Test results {} *****".format(task))
-                    for key, value in test_result.items():
-                        logger.info("  %s = %s", key, value)
-                        writer.write("%s = %s\n" % (key, value))
-                test_results.update(test_result)
+        # if training_args.do_predict:
+        #     logging.info("*** Test ***")
+
+        #     predictions = trainer.predict(test_dataset=test_dataset).predictions[0]
+        #     output_test_file = os.path.join(
+        #         training_args.output_dir, f"test_results_{task}_fold_{i+1}.txt"
+        #     )
+        #     test_result = trainer.evaluate(eval_dataset=test_dataset)
+        #     logger.info(pformat(test_result, indent=4))
+        #     if trainer.is_world_process_zero():
+        #         with open(output_test_file, "w") as writer:
+        #             logger.info("***** Test results {} *****".format(task))
+        #             writer.write("index\tprediction\n")
+        #             if task == "classification":
+        #                 predictions = np.argmax(predictions, axis=1)
+        #             for index, item in enumerate(predictions):
+        #                 if task == "regression":
+        #                     writer.write(
+        #                         "%d\t%3.3f\t%d\n"
+        #                         % (index, item, test_dataset.labels[index])
+        #                     )
+        #                 else:
+        #                     item = test_dataset.get_labels()[item]
+        #                     writer.write("%d\t%s\n" % (index, item))
+        #         output_test_file = os.path.join(
+        #             training_args.output_dir,
+        #             f"test_metric_results_{task}_fold_{i+1}.txt",
+        #         )
+        #         with open(output_test_file, "w") as writer:
+        #             logger.info("***** Test results {} *****".format(task))
+        #             for key, value in test_result.items():
+        #                 logger.info("  %s = %s", key, value)
+        #                 writer.write("%s = %s\n" % (key, value))
+        #         test_results.update(test_result)
+
+        ###
+
         del model
         del config
         del tabular_config
         del trainer
         torch.cuda.empty_cache()
-        total_results.append(test_results)
+        total_results.append(test_results if test_results else eval_results)
     aggr_res = aggregate_results(total_results)
     logger.info("========= Aggr Results ========")
     logger.info(pformat(aggr_res, indent=4))

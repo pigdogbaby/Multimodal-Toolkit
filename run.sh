@@ -4,13 +4,16 @@ export WANDB_API_KEY=###
 python main.py \
     --model_name_or_path None \
     --config_name roberta-tune.json \
-    --data_path /home/wuyou/tabred/data/sberbank-housing/ \
+    --data_path datasets/income/income.csv \
     --column_info_path datasets/income/column_info.json \
-    --output_dir outputs/sweep/ \
+    --output_dir outputs/tmp \
     --run_name roberta-tune-5e_4-test \
     --overwrite_output_dir \
-    --report_to wandb \
-    --task regression \
+    --report_to none \
+    --task imputation \
+    --create_folds \
+    --mask_ratio 0.1 \
+    --alpha 0.1 \
     --metric_for_best_model rmse \
     --greater_is_better False \
     --load_best_model_at_end True \

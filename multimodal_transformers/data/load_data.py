@@ -94,6 +94,7 @@ def load_data_into_folds(
     debug: bool = False,
     debug_dataset_size: int = 100,
     output_dir: Optional[str] = None,
+    mask_ratio: Optional[float] = None,
 ) -> Tuple[
     List[TorchTabularTextDataset],
     List[Optional[TorchTabularTextDataset]],
@@ -227,6 +228,7 @@ def load_data_into_folds(
             debug=debug,
             debug_dataset_size=debug_dataset_size,
             output_dir=output_dir,
+            mask_ratio=mask_ratio,
         )
         train_splits.append(train)
         val_splits.append(val)
@@ -409,6 +411,7 @@ def load_train_val_test_helper(
     debug: bool = False,
     debug_dataset_size: int = 100,
     output_dir: Optional[str] = None,
+    mask_ratio: Optional[float] = None,
 ) -> Tuple[
     TorchTabularTextDataset, Optional[TorchTabularTextDataset], TorchTabularTextDataset
 ]:
@@ -460,6 +463,7 @@ def load_train_val_test_helper(
         debug=debug,
         debug_dataset_size=debug_dataset_size,
         cat_offsets=cat_offsets,
+        mask_ratio=mask_ratio,
     )
     if test_df is not None:
         test_dataset = load_data(
@@ -479,6 +483,7 @@ def load_train_val_test_helper(
             debug=debug,
             debug_dataset_size=debug_dataset_size,
             cat_offsets=cat_offsets,
+            mask_ratio=mask_ratio,
         )
     else:
         test_dataset = None
@@ -501,6 +506,7 @@ def load_train_val_test_helper(
             debug=debug,
             debug_dataset_size=debug_dataset_size,
             cat_offsets=cat_offsets,
+            mask_ratio=mask_ratio,
         )
     else:
         val_dataset = None
@@ -594,6 +600,7 @@ def load_data(
     max_token_length: Optional[int] = None,
     debug: bool = False,
     debug_dataset_size: int = 100,
+    mask_ratio: Optional[float] = None,
 ) -> TorchTabularTextDataset:
     """
     Load a single dataset from a pandas DataFrame.
@@ -652,25 +659,31 @@ def load_data(
         empty_text_values = ["nan", "None"]
 
     # Build categorical features
-    categorical_feats = build_categorical_features(
-        data_df=data_df,
-        categorical_cols=categorical_cols,
-        categorical_transformer=categorical_transformer,
-    )
-    cat_offsets = [0] + cat_offsets
-    cat_offsets = np.cumsum(cat_offsets)
-    categorical_feats = categorical_feats.astype(int) + cat_offsets[:-1]
-    categorical_feats = categorical_feats.to_numpy().astype(int)
+    categorical_feats = None
+    if categorical_cols:
+        categorical_feats = build_categorical_features(
+            data_df=data_df,
+            categorical_cols=categorical_cols,
+            categorical_transformer=categorical_transformer,
+        )
+        print("dbg cat_offsets", cat_offsets)
+        cat_offsets = [0] + cat_offsets
+        cat_offsets = np.cumsum(cat_offsets)
+        categorical_feats = categorical_feats.to_numpy().astype(int) + cat_offsets[:-1]
+        for i in range(categorical_feats.shape[1]):
+            print("dbg categorical_feats", np.unique(categorical_feats[:, i]))
 
     # print("categorical_feats\n", categorical_feats)
     # Build numerical features
+    numerical_labels = data_df[numerical_cols].to_numpy().astype(float)
     numerical_feats = build_numerical_features(
         data_df=data_df,
         numerical_cols=numerical_cols,
         numerical_transformer=numerical_transformer,
     )
     numerical_feats = numerical_feats.to_numpy().astype(float)
-    # print("numerical_feats\n", numerical_feats)
+    # print("numerical_labels\n", numerical_labels[:10])
+    # print("numerical_feats\n", numerical_feats[:10])
 
     # Build text features
     # texts_list = build_text_features(
@@ -693,11 +706,22 @@ def load_data(
     else:
         labels = None
 
+    if mask_ratio:
+        cat_mask = None
+        if categorical_feats is not None:
+            cat_mask = np.random.rand(*categorical_feats.shape) < mask_ratio
+            # print("check cat_mask", np.sum(cat_mask), cat_mask.shape)
+        numerical_mask = np.random.rand(*numerical_feats.shape) < mask_ratio
+        # print("check num_mask", np.sum(num_mask), num_mask.shape)
+
     return TorchTabularTextDataset(
         encodings=None,
         categorical_feats=categorical_feats,
         numerical_feats=numerical_feats,
+        numerical_labels=numerical_labels,
         labels=labels,
         df=data_df,
         label_list=label_list,
+        cat_mask=cat_mask,
+        numerical_mask=numerical_mask,
     )

@@ -162,7 +162,7 @@ class MultimodalDataTrainingArguments:
         default="classification",
         metadata={
             "help": "The downstream training task",
-            "choices": ["classification", "regression"],
+            "choices": ["classification", "regression", "imputation"],
         },
     )
 
@@ -208,6 +208,9 @@ class MultimodalDataTrainingArguments:
             "help": "the beta hyperparameters used for gating tabular data "
             "see https://www.aclweb.org/anthology/2020.acl-main.214.pdf"
         },
+    )
+    mask_ratio: float = field(
+        default=0.1, metadata={"help": "mask ratio used for imputation"}
     )
 
     def __post_init__(self):
@@ -269,6 +272,10 @@ class OurTrainingArguments(TrainingArguments):
 
     learning_rate: float = field(
         default=5e-5, metadata={"help": "The initial learning rate for Adam."}
+    )
+
+    alpha: Optional[float] = field(
+        default=0.1, metadata={"help": "Used for imputation, control two losses."}
     )
 
     def __post_init__(self):

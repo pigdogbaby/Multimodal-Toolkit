@@ -33,6 +33,8 @@ class TabularConfig:
         class_weights=None,
         cat_offsets=None,
         num_feats=0,
+        imputation=False,
+        alpha=0.1,
         **kwargs
     ):
         self.mlp_division = mlp_division
@@ -49,3 +51,5 @@ class TabularConfig:
         self.class_weights = class_weights
         self.cat_offsets = cat_offsets
         self.num_feats = num_feats
+        self.imputation=imputation
+        self.alpha=alpha

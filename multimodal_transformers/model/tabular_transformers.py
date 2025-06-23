@@ -25,10 +25,12 @@ from transformers.file_utils import add_start_docstrings_to_model_forward
 
 from .tabular_combiner import TabularFeatCombiner
 from .tabular_config import TabularConfig
-from .layer_utils import MLP, calc_mlp_dims, hf_loss_func
+from .layer_utils import MLP, calc_mlp_dims, hf_loss_func, hf_loss_func_impute
 
 from .modeling_roberta import MyRobertaModel
 from.modeling_pt import PtModel, PtPreTrainedModel
+from einops import repeat
+import numpy as np
 
 class BertWithTabular(BertForSequenceClassification):
     """
@@ -186,6 +188,22 @@ class RobertaWithTabular(RobertaPreTrainedModel):
                 bn=True,
             )
 
+        self.imputation = tabular_config.imputation
+        if self.imputation:
+            self.alpha = tabular_config.alpha
+            self.cat_offsets = tabular_config.cat_offsets
+            self.cat_heads = nn.ModuleList()
+            for i in tabular_config.cat_offsets:
+                # exclude na_value
+                self.cat_heads.append(
+                    nn.Linear(hf_model_config.hidden_size, i - 1)
+                )
+            self.numerical_heads = nn.ModuleList()
+            for _ in range(tabular_config.numerical_feat_dim):
+                self.numerical_heads.append(
+                    nn.Linear(hf_model_config.hidden_size, 1)
+                )
+
     @add_start_docstrings_to_model_forward(
         ROBERTA_INPUTS_DOCSTRING.format("(batch_size, sequence_length)")
     )
@@ -202,6 +220,8 @@ class RobertaWithTabular(RobertaPreTrainedModel):
         output_hidden_states=None,
         cat_feats=None,
         numerical_feats=None,
+        cat_mask=None,
+        numerical_mask=None,
     ):
         r"""
             labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`, defaults to :obj:`None`):
@@ -233,25 +253,63 @@ class RobertaWithTabular(RobertaPreTrainedModel):
         # print("labels", labels)
         # print("cat_feats", cat_feats)
         # print("numerical_feats", numerical_feats)
-        outputs = self.model(
-            cat_feats=cat_feats,
-            numerical_feats=numerical_feats,
-        )
 
-        sequence_output = outputs[0]
-        # print("sequence_output.size()", sequence_output.size())
-        combined_feats = sequence_output[:, 0, :]
-        combined_feats = self.dropout(combined_feats)
-        loss, logits, classifier_layer_outputs = hf_loss_func(
-            combined_feats,
-            self.tabular_classifier,
-            labels,
-            self.num_labels,
-            self.class_weights,
-        )
-        # print("dbg forward")
-        # print(loss.shape, logits.shape, classifier_layer_outputs.shape)
-        return loss, logits, classifier_layer_outputs
+        if self.imputation:
+            cum_cat_offsets = np.cumsum([0] + self.cat_offsets)
+            mask_index = repeat(torch.tensor(cum_cat_offsets[:-1], device=cat_feats.device), 'd -> b d', b = cat_feats.size(0))
+            cat_input = None
+            if cat_mask is not None:
+                # print(torch.sum(cat_mask))
+                cat_mask[cat_feats == mask_index] = 0
+                # print(torch.sum(cat_mask))
+                cat_input = cat_feats.clone()
+                cat_input[cat_mask] = mask_index[cat_mask]
+            numerical_input = numerical_feats.clone()
+            numerical_input[numerical_mask] = 0
+            outputs = self.model(
+                cat_feats=cat_input,
+                numerical_feats=numerical_input,
+                numerical_mask=numerical_mask
+            )
+
+            sequence_output = outputs[0]
+            combined_feats = self.dropout(sequence_output)
+            cat_feats -= mask_index + 1
+            loss, logits, classifier_layer_outputs = hf_loss_func_impute(
+                combined_feats,
+                self.tabular_classifier,
+                cat_feats,
+                numerical_feats,
+                self.cat_offsets,
+                self.cat_heads,
+                self.numerical_heads,
+                cat_mask,
+                numerical_mask,
+                self.alpha,
+            )
+            # print("dbg forward")
+            # print(loss.shape, logits.shape, classifier_layer_outputs[0].shape, classifier_layer_outputs[1].shape)
+            return loss, logits, classifier_layer_outputs
+        else:
+            outputs = self.model(
+                cat_feats=cat_feats,
+                numerical_feats=numerical_feats,
+            )
+
+            sequence_output = outputs[0]
+            # print("sequence_output.size()", sequence_output.size())
+            combined_feats = sequence_output[:, 0, :]
+            combined_feats = self.dropout(combined_feats)
+            loss, logits, classifier_layer_outputs = hf_loss_func(
+                combined_feats,
+                self.tabular_classifier,
+                labels,
+                self.num_labels,
+                self.class_weights,
+            )
+            # print("dbg forward")
+            # print(loss.shape, logits.shape, classifier_layer_outputs.shape)
+            return loss, logits, classifier_layer_outputs
 
 class PtWithTabular(PtPreTrainedModel):
     """
@@ -301,6 +359,22 @@ class PtWithTabular(PtPreTrainedModel):
                 bn=True,
             )
 
+        self.imputation = tabular_config.imputation
+        if self.imputation:
+            self.alpha = tabular_config.alpha
+            self.cat_offsets = tabular_config.cat_offsets
+            self.cat_heads = nn.ModuleList()
+            for i in tabular_config.cat_offsets:
+                # exclude na_value
+                self.cat_heads.append(
+                    nn.Linear(hf_model_config.hidden_size, i - 1)
+                )
+            self.numerical_heads = nn.ModuleList()
+            for _ in range(tabular_config.numerical_feat_dim):
+                self.numerical_heads.append(
+                    nn.Linear(hf_model_config.hidden_size, 1)
+                )
+
     @add_start_docstrings_to_model_forward(
         ROBERTA_INPUTS_DOCSTRING.format("(batch_size, sequence_length)")
     )
@@ -317,6 +391,8 @@ class PtWithTabular(PtPreTrainedModel):
         output_hidden_states=None,
         cat_feats=None,
         numerical_feats=None,
+        cat_mask=None,
+        numerical_mask=None,
     ):
         r"""
             labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`, defaults to :obj:`None`):
@@ -348,26 +424,63 @@ class PtWithTabular(PtPreTrainedModel):
         # print("labels", labels)
         # print("cat_feats", cat_feats)
         # print("numerical_feats", numerical_feats)
-        outputs = self.model(
-            cat_feats=cat_feats,
-            numerical_feats=numerical_feats,
-        )
 
-        sequence_output = outputs[0]
-        # print("sequence_output.size()", sequence_output.size())
-        combined_feats = sequence_output[:, 0, :]
-        combined_feats = self.dropout(combined_feats)
-        loss, logits, classifier_layer_outputs = hf_loss_func(
-            combined_feats,
-            self.tabular_classifier,
-            labels,
-            self.num_labels,
-            self.class_weights,
-        )
-        # print("dbg loss", loss)
-        # print("dbg logits", logits)
-        # print("dbg classifier_layer_outputs", classifier_layer_outputs)
-        return loss, logits, classifier_layer_outputs
+        if self.imputation:
+            cum_cat_offsets = np.cumsum([0] + self.cat_offsets)
+            mask_index = repeat(torch.tensor(cum_cat_offsets[:-1], device=cat_feats.device), 'd -> b d', b = cat_feats.size(0))
+            cat_input = None
+            if cat_mask is not None:
+                # print(torch.sum(cat_mask))
+                cat_mask[cat_feats == mask_index] = 0
+                # print(torch.sum(cat_mask))
+                cat_input = cat_feats.clone()
+                cat_input[cat_mask] = mask_index[cat_mask]
+            numerical_input = numerical_feats.clone()
+            numerical_input[numerical_mask] = 0
+            outputs = self.model(
+                cat_feats=cat_input,
+                numerical_feats=numerical_input,
+                numerical_mask=numerical_mask
+            )
+
+            sequence_output = outputs[0]
+            combined_feats = self.dropout(sequence_output)
+            cat_feats -= mask_index + 1
+            loss, logits, classifier_layer_outputs = hf_loss_func_impute(
+                combined_feats,
+                self.tabular_classifier,
+                cat_feats,
+                numerical_feats,
+                self.cat_offsets,
+                self.cat_heads,
+                self.numerical_heads,
+                cat_mask,
+                numerical_mask,
+                self.alpha,
+            )
+            # print("dbg forward")
+            # print(loss.shape, logits.shape, classifier_layer_outputs[0].shape, classifier_layer_outputs[1].shape)
+            return loss, logits, classifier_layer_outputs
+        else:
+            outputs = self.model(
+                cat_feats=cat_feats,
+                numerical_feats=numerical_feats,
+            )
+
+            sequence_output = outputs[0]
+            # print("sequence_output.size()", sequence_output.size())
+            combined_feats = sequence_output[:, 0, :]
+            combined_feats = self.dropout(combined_feats)
+            loss, logits, classifier_layer_outputs = hf_loss_func(
+                combined_feats,
+                self.tabular_classifier,
+                labels,
+                self.num_labels,
+                self.class_weights,
+            )
+            # print("dbg forward")
+            # print(loss.shape, logits.shape, classifier_layer_outputs.shape)
+            return loss, logits, classifier_layer_outputs
 
 class XLMRobertaWithTabular(RobertaWithTabular):
     """
