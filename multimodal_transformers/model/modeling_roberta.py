@@ -698,42 +698,42 @@ class RobertaEncoder(nn.Module):
                 use_cache = False
 
         next_decoder_cache = () if use_cache else None
-        for i, layer_module in enumerate(self.layer):
-            if output_hidden_states:
-                all_hidden_states = all_hidden_states + (hidden_states,)
+        # for i, layer_module in enumerate(self.layer):
+        #     if output_hidden_states:
+        #         all_hidden_states = all_hidden_states + (hidden_states,)
 
-            layer_head_mask = head_mask[i] if head_mask is not None else None
-            past_key_value = past_key_values[i] if past_key_values is not None else None
+        #     layer_head_mask = head_mask[i] if head_mask is not None else None
+        #     past_key_value = past_key_values[i] if past_key_values is not None else None
 
-            if self.gradient_checkpointing and self.training:
-                layer_outputs = self._gradient_checkpointing_func(
-                    layer_module.__call__,
-                    hidden_states,
-                    attention_mask,
-                    layer_head_mask,
-                    encoder_hidden_states,
-                    encoder_attention_mask,
-                    past_key_value,
-                    output_attentions,
-                )
-            else:
-                layer_outputs = layer_module(
-                    hidden_states,
-                    attention_mask,
-                    layer_head_mask,
-                    encoder_hidden_states,
-                    encoder_attention_mask,
-                    past_key_value,
-                    output_attentions,
-                )
+        #     if self.gradient_checkpointing and self.training:
+        #         layer_outputs = self._gradient_checkpointing_func(
+        #             layer_module.__call__,
+        #             hidden_states,
+        #             attention_mask,
+        #             layer_head_mask,
+        #             encoder_hidden_states,
+        #             encoder_attention_mask,
+        #             past_key_value,
+        #             output_attentions,
+        #         )
+        #     else:
+        #         layer_outputs = layer_module(
+        #             hidden_states,
+        #             attention_mask,
+        #             layer_head_mask,
+        #             encoder_hidden_states,
+        #             encoder_attention_mask,
+        #             past_key_value,
+        #             output_attentions,
+        #         )
 
-            hidden_states = layer_outputs[0]
-            if use_cache:
-                next_decoder_cache += (layer_outputs[-1],)
-            if output_attentions:
-                all_self_attentions = all_self_attentions + (layer_outputs[1],)
-                if self.config.add_cross_attention:
-                    all_cross_attentions = all_cross_attentions + (layer_outputs[2],)
+        #     hidden_states = layer_outputs[0]
+        #     if use_cache:
+        #         next_decoder_cache += (layer_outputs[-1],)
+        #     if output_attentions:
+        #         all_self_attentions = all_self_attentions + (layer_outputs[1],)
+        #         if self.config.add_cross_attention:
+        #             all_cross_attentions = all_cross_attentions + (layer_outputs[2],)
 
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
@@ -911,15 +911,19 @@ class MyRobertaModel(RobertaPreTrainedModel):
         # nn.init.normal_(self.num_embeddings, mean=0.0, std=config.initializer_range)
         # nn.init.normal_(self.num_bias, mean=0.0, std=config.initializer_range)
         # self.num_linear = nn.Linear(2 * config.hidden_size, config.hidden_size)
-        if isinstance(config.hidden_act, str):
-            self.act_fn = ACT2FN[config.hidden_act]
-        else:
-            self.act_fn = config.hidden_act
+        # if isinstance(config.hidden_act, str):
+        #     self.act_fn = ACT2FN[config.hidden_act]
+        # else:
+        #     self.act_fn = config.hidden_act
+
         # sin
-        self.num_sin = nn.Parameter(torch.empty(config.tabular_config['numerical_feat_dim'], config.hidden_size // 2))
-        self.num_cos = nn.Parameter(torch.empty(config.tabular_config['numerical_feat_dim'], config.hidden_size // 2))
-        nn.init.normal_(self.num_sin, mean=0.0, std=config.initializer_range)
-        nn.init.normal_(self.num_cos, mean=0.0, std=config.initializer_range)
+        # self.num_sin = nn.Parameter(torch.empty(config.tabular_config['numerical_feat_dim'], config.hidden_size // 2))
+        # self.num_cos = nn.Parameter(torch.empty(config.tabular_config['numerical_feat_dim'], config.hidden_size // 2))
+        # nn.init.normal_(self.num_sin, mean=0.0, std=config.initializer_range)
+        # nn.init.normal_(self.num_cos, mean=0.0, std=config.initializer_range)
+
+        self.num_embeddings = nn.Parameter(torch.randn(config.tabular_config['numerical_feat_dim'], config.hidden_size))
+        self.num_bias = nn.Parameter(torch.randn(config.tabular_config['numerical_feat_dim'], config.hidden_size))
 
         self.attn_implementation = config._attn_implementation
         self.position_embedding_type = config.position_embedding_type
@@ -1004,12 +1008,31 @@ class MyRobertaModel(RobertaPreTrainedModel):
         numerical_feats = rearrange(numerical_feats, 'b n -> b n 1')
         # mlp
         # num_tensor = self.num_linear(self.act_fn(numerical_feats * self.num_embeddings + self.num_bias))
+
         # sin
-        sin_tensor = torch.sin(numerical_feats * self.num_sin * torch.tensor(2 * math.pi))
-        cos_tensor = torch.cos(numerical_feats * self.num_cos * torch.tensor(2 * math.pi))
-        num_tensor = torch.cat((sin_tensor, cos_tensor), dim=-1)
+        # sin_tensor = torch.sin(numerical_feats * self.num_sin * torch.tensor(2 * math.pi))
+        # cos_tensor = torch.cos(numerical_feats * self.num_cos * torch.tensor(2 * math.pi))
+        # num_tensor = torch.cat((sin_tensor, cos_tensor), dim=-1)
+
+        num_tensor = numerical_feats * self.num_embeddings
         cls_tensor = repeat(self.cls_token, '1 1 d -> b 1 d', b = batch_size)
         input = torch.cat((cat_tensor, num_tensor, cls_tensor), dim=1)
+
+        # probing
+        all_embeddings = self.num_embeddings.data
+        norms = torch.norm(all_embeddings, p=2, dim=1)
+        print("parameter norms", norms.min().item(), norms.max().item(), norms.mean().item())
+        normalized_embeddings = torch.nn.functional.normalize(all_embeddings, p=2, dim=1)
+        cosine_similarities = torch.mm(normalized_embeddings, normalized_embeddings.T)
+        print("parameter cos_sims", cosine_similarities.min().item(), cosine_similarities.max().item(), cosine_similarities.mean().item())
+
+        all_tensor = num_tensor[0].data
+        norms = torch.norm(all_tensor, p=2, dim=1)
+        print("tensor norms", norms.min().item(), norms.max().item(), norms.mean().item())
+        normalized_embeddings = torch.nn.functional.normalize(all_tensor, p=2, dim=1)
+        cosine_similarities = torch.mm(normalized_embeddings, normalized_embeddings.T)
+        print("tensor cos_sims", cosine_similarities.min().item(), cosine_similarities.max().item(), cosine_similarities.mean().item())\
+
         # if self.dbg < 5:
         #     self.dbg += 1
         #     print(input.shape)
