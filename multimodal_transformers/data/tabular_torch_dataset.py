@@ -37,7 +37,7 @@ class TorchTabularTextDataset(TorchDataset):
         # categorical_feats: Optional[pd.DataFrame],
         categorical_feats: Optional[np.ndarray],
         numerical_feats: Optional[np.ndarray],
-        numerical_labels: Optional[np.ndarray],
+        numerical_labels: Optional[np.ndarray] = None,
         labels: Optional[Union[List, np.ndarray]] = None,
         df: Optional[pd.DataFrame] = None,
         label_list: Optional[List[Union[str]]] = None,
