@@ -1,3 +1,5 @@
+export HTTP_PROXY=http://127.0.0.1:7890
+export HTTPS_PROXY=http://127.0.0.1:7890
 export WANDB_PROJECT=sweeps_demo
 export WANDB_API_KEY=###
 
@@ -9,7 +11,7 @@ python main.py \
     --output_dir outputs/tmp \
     --run_name roberta-tune-5e_4-test \
     --overwrite_output_dir \
-    --report_to none \
+    --report_to wandb \
     --task imputation \
     --create_folds \
     --mask_ratio 0.1 \

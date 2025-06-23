@@ -193,46 +193,80 @@ def load_data_into_folds(
     """
 
     assert 0 <= validation_ratio <= 1, "validation ratio needs to be between 0 and 1"
-    print("validation_ratio", validation_ratio)
+    # print("validation_ratio", validation_ratio)
+    # kfold = KFold(num_splits, shuffle=True, random_state=5)
     folds_df = pd.read_csv(data_csv_path, skipinitialspace=True)
-    kfold = KFold(num_splits, shuffle=True, random_state=5)
 
-    train_splits, val_splits, test_splits, cat_offsets = [], [], [], []
+    train_splits, val_splits, test_splits = [], [], []
 
-    for train_index, val_index in kfold.split(folds_df):
-        train_df = folds_df.copy().iloc[train_index]
-        val_df = folds_df.copy().iloc[val_index]
+    # for train_index, val_index in kfold.split(folds_df):
+    #     train_df = folds_df.copy().iloc[train_index]
+    #     val_df = folds_df.copy().iloc[val_index]
 
-        train, val, test, cat_offsets = load_train_val_test_helper(
-            train_df=train_df,
-            val_df=val_df,
-            test_df=None,
-            text_cols=text_cols,
-            tokenizer=tokenizer,
-            label_col=label_col,
-            label_list=label_list,
-            categorical_cols=categorical_cols,
-            numerical_cols=numerical_cols,
-            sep_text_token_str=sep_text_token_str,
-            categorical_encode_type=categorical_encode_type,
-            categorical_handle_na=categorical_handle_na,
-            categorical_na_value=categorical_na_value,
-            ohe_handle_unknown=ohe_handle_unknown,
-            numerical_transformer_method=numerical_transformer_method,
-            numerical_handle_na=numerical_handle_na,
-            numerical_how_handle_na=numerical_how_handle_na,
-            numerical_na_value=numerical_na_value,
-            empty_text_values=empty_text_values,
-            replace_empty_text=replace_empty_text,
-            max_token_length=max_token_length,
-            debug=debug,
-            debug_dataset_size=debug_dataset_size,
-            output_dir=output_dir,
-            mask_ratio=mask_ratio,
-        )
-        train_splits.append(train)
-        val_splits.append(val)
-        test_splits.append(test)
+    #     train, val, test, cat_offsets = load_train_val_test_helper(
+    #         train_df=train_df,
+    #         val_df=val_df,
+    #         test_df=None,
+    #         text_cols=text_cols,
+    #         tokenizer=tokenizer,
+    #         label_col=label_col,
+    #         label_list=label_list,
+    #         categorical_cols=categorical_cols,
+    #         numerical_cols=numerical_cols,
+    #         sep_text_token_str=sep_text_token_str,
+    #         categorical_encode_type=categorical_encode_type,
+    #         categorical_handle_na=categorical_handle_na,
+    #         categorical_na_value=categorical_na_value,
+    #         ohe_handle_unknown=ohe_handle_unknown,
+    #         numerical_transformer_method=numerical_transformer_method,
+    #         numerical_handle_na=numerical_handle_na,
+    #         numerical_how_handle_na=numerical_how_handle_na,
+    #         numerical_na_value=numerical_na_value,
+    #         empty_text_values=empty_text_values,
+    #         replace_empty_text=replace_empty_text,
+    #         max_token_length=max_token_length,
+    #         debug=debug,
+    #         debug_dataset_size=debug_dataset_size,
+    #         output_dir=output_dir,
+    #         mask_ratio=mask_ratio,
+    #     )
+    #     train_splits.append(train)
+    #     val_splits.append(val)
+    #     test_splits.append(test)
+    
+    # train-test-val split
+    train_df, others_df = train_test_split(folds_df, test_size=0.3, random_state=42)
+    val_df, test_df = train_test_split(others_df, test_size=0.33, random_state=42)
+    train, val, test, cat_offsets = load_train_val_test_helper(
+        train_df=train_df,
+        val_df=val_df,
+        test_df=test_df,
+        text_cols=text_cols,
+        tokenizer=tokenizer,
+        label_col=label_col,
+        label_list=label_list,
+        categorical_cols=categorical_cols,
+        numerical_cols=numerical_cols,
+        sep_text_token_str=sep_text_token_str,
+        categorical_encode_type=categorical_encode_type,
+        categorical_handle_na=categorical_handle_na,
+        categorical_na_value=categorical_na_value,
+        ohe_handle_unknown=ohe_handle_unknown,
+        numerical_transformer_method=numerical_transformer_method,
+        numerical_handle_na=numerical_handle_na,
+        numerical_how_handle_na=numerical_how_handle_na,
+        numerical_na_value=numerical_na_value,
+        empty_text_values=empty_text_values,
+        replace_empty_text=replace_empty_text,
+        max_token_length=max_token_length,
+        debug=debug,
+        debug_dataset_size=debug_dataset_size,
+        output_dir=output_dir,
+        mask_ratio=mask_ratio,
+    )
+    train_splits.append(train)
+    val_splits.append(val)
+    test_splits.append(test)
 
     return train_splits, val_splits, test_splits, cat_offsets
 
