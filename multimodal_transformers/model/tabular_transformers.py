@@ -172,6 +172,9 @@ class RobertaWithTabular(RobertaPreTrainedModel):
             self.tabular_classifier = nn.Linear(
                 hf_model_config.hidden_size, tabular_config.num_labels
             )
+            self.probing = nn.Linear(
+                hf_model_config.hidden_size, self.num_feats
+            )
         else:
             dims = calc_mlp_dims(
                 combined_feat_dim,
@@ -186,9 +189,14 @@ class RobertaWithTabular(RobertaPreTrainedModel):
                 hidden_channels=dims,
                 bn=True,
             )
-        self.probing = nn.Linear(
-            hf_model_config.hidden_size, self.num_feats
-        )
+            self.probing = MLP(
+                hf_model_config.hidden_size,
+                self.num_feats,
+                num_hidden_lyr=1,
+                dropout_prob=0.1,
+                hidden_channels=[2 * hf_model_config.hidden_size,],
+                bn=False,
+            )
         self.model.requires_grad_(False)
 
     @add_start_docstrings_to_model_forward(

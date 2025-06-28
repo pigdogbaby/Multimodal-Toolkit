@@ -353,49 +353,49 @@ def main():
             )
             test_result = trainer.evaluate(eval_dataset=test_dataset)
             logger.info(pformat(test_result, indent=4))
-            if trainer.is_world_process_zero():
-                with open(output_test_file, "w") as writer:
-                    logger.info("***** Test results {} *****".format(task))
-                    writer.write("index\tprediction\n")
-                    if task == "classification":
-                        predictions = np.argmax(predictions, axis=1)
-                    for index, item in enumerate(predictions):
-                        if task == "regression":
-                            writer.write(
-                                "%d\t%3.3f\t%d\n"
-                                % (index, item, test_dataset.labels[index])
-                            )
-                        else:
-                            item = test_dataset.get_labels()[item]
-                            writer.write("%d\t%s\n" % (index, item))
-                output_test_file = os.path.join(
-                    training_args.output_dir,
-                    f"test_metric_results_{task}_fold_{i+1}.txt",
-                )
-                with open(output_test_file, "w") as writer:
-                    logger.info("***** Test results {} *****".format(task))
-                    for key, value in test_result.items():
-                        logger.info("  %s = %s", key, value)
-                        writer.write("%s = %s\n" % (key, value))
-                test_results.update(test_result)
+            # if trainer.is_world_process_zero():
+            #     with open(output_test_file, "w") as writer:
+            #         logger.info("***** Test results {} *****".format(task))
+            #         writer.write("index\tprediction\n")
+            #         if task == "classification":
+            #             predictions = np.argmax(predictions, axis=1)
+            #         for index, item in enumerate(predictions):
+            #             if task == "regression":
+            #                 writer.write(
+            #                     "%d\t%3.3f\t%d\n"
+            #                     % (index, item, test_dataset.labels[index])
+            #                 )
+            #             else:
+            #                 item = test_dataset.get_labels()[item]
+            #                 writer.write("%d\t%s\n" % (index, item))
+            #     output_test_file = os.path.join(
+            #         training_args.output_dir,
+            #         f"test_metric_results_{task}_fold_{i+1}.txt",
+            #     )
+            #     with open(output_test_file, "w") as writer:
+            #         logger.info("***** Test results {} *****".format(task))
+            #         for key, value in test_result.items():
+            #             logger.info("  %s = %s", key, value)
+            #             writer.write("%s = %s\n" % (key, value))
+            #     test_results.update(test_result)
         del model
         del config
         del tabular_config
         del trainer
         torch.cuda.empty_cache()
         total_results.append(test_results)
-    aggr_res = aggregate_results(total_results)
-    logger.info("========= Aggr Results ========")
-    logger.info(pformat(aggr_res, indent=4))
+    # aggr_res = aggregate_results(total_results)
+    # logger.info("========= Aggr Results ========")
+    # logger.info(pformat(aggr_res, indent=4))
 
-    output_aggre_test_file = os.path.join(
-        training_args.output_dir, f"all_test_metric_results_{task}.txt"
-    )
-    with open(output_aggre_test_file, "w") as writer:
-        logger.info("***** Aggr results {} *****".format(task))
-        for key, value in aggr_res.items():
-            logger.info("  %s = %s", key, value)
-            writer.write("%s = %s\n" % (key, value))
+    # output_aggre_test_file = os.path.join(
+    #     training_args.output_dir, f"all_test_metric_results_{task}.txt"
+    # )
+    # with open(output_aggre_test_file, "w") as writer:
+    #     logger.info("***** Aggr results {} *****".format(task))
+    #     for key, value in aggr_res.items():
+    #         logger.info("  %s = %s", key, value)
+    #         writer.write("%s = %s\n" % (key, value))
 
 
 def aggregate_results(total_test_results):

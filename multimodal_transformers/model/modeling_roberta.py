@@ -1014,24 +1014,24 @@ class MyRobertaModel(RobertaPreTrainedModel):
         # cos_tensor = torch.cos(numerical_feats * self.num_cos * torch.tensor(2 * math.pi))
         # num_tensor = torch.cat((sin_tensor, cos_tensor), dim=-1)
 
-        num_tensor = numerical_feats * self.num_embeddings
+        num_tensor = numerical_feats * self.num_embeddings# + self.num_bias
         cls_tensor = repeat(self.cls_token, '1 1 d -> b 1 d', b = batch_size)
         input = torch.cat((cat_tensor, num_tensor, cls_tensor), dim=1)
 
         # probing
-        all_embeddings = self.num_embeddings.data
-        norms = torch.norm(all_embeddings, p=2, dim=1)
-        print("parameter norms", norms.min().item(), norms.max().item(), norms.mean().item())
-        normalized_embeddings = torch.nn.functional.normalize(all_embeddings, p=2, dim=1)
-        cosine_similarities = torch.mm(normalized_embeddings, normalized_embeddings.T)
-        print("parameter cos_sims", cosine_similarities.min().item(), cosine_similarities.max().item(), cosine_similarities.mean().item())
+        # all_embeddings = self.num_embeddings.data
+        # norms = torch.norm(all_embeddings, p=2, dim=1)
+        # print("parameter norms", norms.min().item(), norms.max().item(), norms.mean().item())
+        # normalized_embeddings = torch.nn.functional.normalize(all_embeddings, p=2, dim=1)
+        # cosine_similarities = torch.mm(normalized_embeddings, normalized_embeddings.T)
+        # print("parameter cos_sims", cosine_similarities.min().item(), cosine_similarities.max().item(), cosine_similarities.mean().item())
 
-        all_tensor = num_tensor[0].data
-        norms = torch.norm(all_tensor, p=2, dim=1)
-        print("tensor norms", norms.min().item(), norms.max().item(), norms.mean().item())
-        normalized_embeddings = torch.nn.functional.normalize(all_tensor, p=2, dim=1)
-        cosine_similarities = torch.mm(normalized_embeddings, normalized_embeddings.T)
-        print("tensor cos_sims", cosine_similarities.min().item(), cosine_similarities.max().item(), cosine_similarities.mean().item())\
+        # all_tensor = num_tensor[0].data
+        # norms = torch.norm(all_tensor, p=2, dim=1)
+        # print("tensor norms", norms.min().item(), norms.max().item(), norms.mean().item())
+        # normalized_embeddings = torch.nn.functional.normalize(all_tensor, p=2, dim=1)
+        # cosine_similarities = torch.mm(normalized_embeddings, normalized_embeddings.T)
+        # print("tensor cos_sims", cosine_similarities.min().item(), cosine_similarities.max().item(), cosine_similarities.mean().item())\
 
         # if self.dbg < 5:
         #     self.dbg += 1
