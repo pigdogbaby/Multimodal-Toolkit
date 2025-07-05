@@ -1,17 +1,18 @@
-export HTTP_PROXY=http://127.0.0.1:7890
-export HTTPS_PROXY=http://127.0.0.1:7890
-export WANDB_PROJECT=probing
+export HTTP_PROXY=http://127.0.0.1:8890
+export HTTPS_PROXY=http://127.0.0.1:8890
+export WANDB_PROJECT=probing-housing
 export WANDB_API_KEY=cf12a933e3e4edbc59fd0674ca4173fec75e11a4
 
 python main.py \
-    --model_name_or_path outputs/tabred-pretrain/ecom-roberta-tune-random \
+    --model_name_or_path outputs/impute-pretrain/housing-roberta-tune-5e_4-mode3 \
     --config_name roberta-tune.json \
-    --data_path /home/wuyou/tabred/data/ecom-offers/ \
-    --column_info_path datasets/income/column_info.json \
-    --output_dir outputs/probing/roberta-tune-random-dbg \
-    --run_name roberta-tune-5e_4-mode1 \
+    --data_path datasets/housing/housing.csv \
+    --column_info_path datasets/housing/column_info.json \
+    --output_dir outputs/probing/housing-roberta-tune-5e_4-mode3 \
+    --run_name housing-roberta-tune-5e_4-mode3 \
+    --create_folds \
     --overwrite_output_dir \
-    --report_to none \
+    --report_to wandb \
     --task regression \
     --metric_for_best_model acc \
     --greater_is_better True \

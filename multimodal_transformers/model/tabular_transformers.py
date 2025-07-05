@@ -251,9 +251,7 @@ class RobertaWithTabular(RobertaPreTrainedModel):
             numerical_feats=numerical_feats,
         )
 
-        sequence_output = outputs[0]
-        # print("sequence_output.size()", sequence_output.size())
-        combined_feats = sequence_output[:, 1:, :]
+        combined_feats = outputs[0]
         combined_feats = self.dropout(combined_feats)
         loss, logits, classifier_layer_outputs = hf_loss_func(
             combined_feats,

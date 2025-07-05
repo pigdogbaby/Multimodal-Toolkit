@@ -172,9 +172,9 @@ class RobertaSelfAttention(nn.Module):
             self.key = nn.Linear(config.hidden_size, self.all_head_size)
             self.value = nn.Linear(config.hidden_size, self.all_head_size)
         elif self.attention_mode == 2:
-            self.query = nn.Parameter(torch.empty(config.tabular_config['num_feats'] + 1, config.hidden_size, self.all_head_size))
-            self.key = nn.Parameter(torch.empty(config.tabular_config['num_feats'] + 1, config.hidden_size, self.all_head_size))
-            self.value = nn.Parameter(torch.empty(config.tabular_config['num_feats'] + 1, config.hidden_size, self.all_head_size))
+            self.query = nn.Parameter(torch.empty(config.tabular_config['num_feats'], config.hidden_size, self.all_head_size))
+            self.key = nn.Parameter(torch.empty(config.tabular_config['num_feats'], config.hidden_size, self.all_head_size))
+            self.value = nn.Parameter(torch.empty(config.tabular_config['num_feats'], config.hidden_size, self.all_head_size))
             nn.init.normal_(self.query, mean=0.0, std=config.initializer_range)
             nn.init.normal_(self.key, mean=0.0, std=config.initializer_range)
             nn.init.normal_(self.value, mean=0.0, std=config.initializer_range)
@@ -182,9 +182,9 @@ class RobertaSelfAttention(nn.Module):
             self.query = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
             self.key = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
             self.value = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size))
-            self.query1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'] + 1, self.all_head_size))
-            self.key1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'] + 1, self.all_head_size))
-            self.value1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'] + 1, self.all_head_size))
+            self.query1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'], self.all_head_size))
+            self.key1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'], self.all_head_size))
+            self.value1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'], self.all_head_size))
             nn.init.normal_(self.query, mean=0.0, std=config.initializer_range)
             nn.init.normal_(self.key, mean=0.0, std=config.initializer_range)
             nn.init.normal_(self.value, mean=0.0, std=config.initializer_range)
@@ -195,9 +195,9 @@ class RobertaSelfAttention(nn.Module):
             self.query = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size, self.rank))
             self.key = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size, self.rank))
             self.value = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size, self.rank))
-            self.query1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'] + 1, config.hidden_size, self.rank))
-            self.key1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'] + 1, config.hidden_size, self.rank))
-            self.value1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'] + 1, config.hidden_size, self.rank))
+            self.query1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'], config.hidden_size, self.rank))
+            self.key1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'], config.hidden_size, self.rank))
+            self.value1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'], config.hidden_size, self.rank))
             nn.init.normal_(self.query, mean=0.0, std=config.initializer_range)
             nn.init.normal_(self.key, mean=0.0, std=config.initializer_range)
             nn.init.normal_(self.value, mean=0.0, std=config.initializer_range)
@@ -208,9 +208,9 @@ class RobertaSelfAttention(nn.Module):
             self.query = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size, self.rank))
             self.key = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size, self.rank))
             self.value = nn.Parameter(torch.empty(config.hidden_size, self.all_head_size, self.rank))
-            self.query1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'] + 1, self.all_head_size, self.rank))
-            self.key1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'] + 1, self.all_head_size, self.rank))
-            self.value1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'] + 1, self.all_head_size, self.rank))
+            self.query1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'], self.all_head_size, self.rank))
+            self.key1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'], self.all_head_size, self.rank))
+            self.value1 = nn.Parameter(torch.empty(config.tabular_config['num_feats'], self.all_head_size, self.rank))
             nn.init.normal_(self.query, mean=0.0, std=config.initializer_range)
             nn.init.normal_(self.key, mean=0.0, std=config.initializer_range)
             nn.init.normal_(self.value, mean=0.0, std=config.initializer_range)
@@ -1004,7 +1004,7 @@ class MyRobertaModel(RobertaPreTrainedModel):
         # print("cat_feats.size()", cat_feats.size())
         # print("numerical_feats.size()", numerical_feats.size())
         batch_size = cat_feats.size(0)
-        cat_tensor = self.cat_embeddings(cat_feats)
+        cat_tensor = self.cat_embeddings(cat_feats) if cat_feats is not None and cat_feats.nelement() > 0 else None
         numerical_feats = rearrange(numerical_feats, 'b n -> b n 1')
         # mlp
         # num_tensor = self.num_linear(self.act_fn(numerical_feats * self.num_embeddings + self.num_bias))
@@ -1015,8 +1015,7 @@ class MyRobertaModel(RobertaPreTrainedModel):
         # num_tensor = torch.cat((sin_tensor, cos_tensor), dim=-1)
 
         num_tensor = numerical_feats * self.num_embeddings# + self.num_bias
-        cls_tensor = repeat(self.cls_token, '1 1 d -> b 1 d', b = batch_size)
-        input = torch.cat((cat_tensor, num_tensor, cls_tensor), dim=1)
+        input = torch.cat((cat_tensor, num_tensor), dim=1) if cat_tensor is not None and cat_feats.nelement() > 0 else num_tensor
 
         # probing
         # all_embeddings = self.num_embeddings.data
